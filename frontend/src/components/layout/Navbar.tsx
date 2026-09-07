@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, UserCheck, LogOut, Shield, Wifi, WifiOff, FileSpreadsheet, Activity } from 'lucide-react';
+import { Building2, UserCheck, LogOut, Shield, Wifi, WifiOff, FileSpreadsheet, Activity, Menu } from 'lucide-react';
 import { useAuth, UserRole } from '../../context/AuthContext';
 import { api } from '../../api/client';
 
 interface NavbarProps {
   submissionId?: string;
   onExportExcel?: () => void;
+  onToggleSidebar?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ submissionId, onExportExcel }) => {
+export const Navbar: React.FC<NavbarProps> = ({ submissionId, onExportExcel, onToggleSidebar }) => {
   const { user, logout } = useAuth();
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -45,9 +46,19 @@ export const Navbar: React.FC<NavbarProps> = ({ submissionId, onExportExcel }) =
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Brand & Institution */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-brand-600 flex items-center justify-center text-white shadow-md shadow-brand-900/40">
-              <Building2 className="w-5 h-5" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            {onToggleSidebar && (
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className="p-1.5 -ml-1.5 mr-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg md:hidden transition-colors"
+                title="Toggle Sidebar"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-brand-600 flex items-center justify-center text-white shadow-md shadow-brand-900/40 flex-shrink-0">
+              <Building2 className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">

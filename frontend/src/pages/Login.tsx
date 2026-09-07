@@ -30,7 +30,7 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-900 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="mx-auto w-14 h-14 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-xl shadow-brand-900/50 mb-4">
           <Building2 className="w-8 h-8" />
@@ -44,7 +44,7 @@ export const Login: React.FC = () => {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-6 shadow-2xl rounded-2xl sm:px-10 border border-slate-200">
+        <div className="bg-white py-8 px-5 shadow-2xl rounded-2xl sm:px-10 border border-slate-200">
           {errorMsg && (
             <div className="mb-4 flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />

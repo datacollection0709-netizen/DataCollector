@@ -116,7 +116,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
         </div>
 
         {/* Action Pills: Proofs & Remarks & NA Toggle */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
+        <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0">
           {/* Not Applicable button */}
           <button
             type="button"

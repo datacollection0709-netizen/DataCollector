@@ -13,6 +13,7 @@ import { Loader2 } from 'lucide-react';
 export const App: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   // Application Data State
   const [attribute, setAttribute] = useState<any | null>(null);
@@ -85,18 +86,31 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navbar submissionId={submission?.id} onExportExcel={handleExportExcel} />
+      <Navbar submissionId={submission?.id} onExportExcel={handleExportExcel} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto relative">
+        {/* Mobile Sidebar Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-slate-900/50 z-40 md:hidden backdrop-blur-sm" 
+            onClick={() => setIsSidebarOpen(false)} 
+          />
+        )}
+
         <Sidebar
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={(tab) => {
+            setActiveTab(tab);
+            setIsSidebarOpen(false); // Close sidebar on mobile after selecting a tab
+          }}
           progress={progress}
           submissionStatus={submission?.status}
           onExportExcel={handleExportExcel}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
 
-        <main className="flex-1 p-6 lg:p-8 max-w-5xl overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl overflow-y-auto w-full">
           {errorMsg && (
             <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
               {errorMsg}

@@ -12,6 +12,7 @@ import {
   ClipboardList,
   CheckCircle2,
   AlertCircle,
+  X,
 } from 'lucide-react';
 import { ProgressBar } from '../ui/ProgressBar';
 import { useAuth } from '../../context/AuthContext';
@@ -30,6 +31,8 @@ interface SidebarProps {
   };
   submissionStatus?: string;
   onExportExcel: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -38,6 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   progress,
   submissionStatus,
   onExportExcel,
+  isOpen,
+  onClose,
 }) => {
   const { user } = useAuth();
 
@@ -53,10 +58,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isElevated = user?.role === 'ADMIN' || user?.role === 'REVIEWER';
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 min-h-[calc(100vh-4rem)]">
+    <aside 
+      className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out md:static md:translate-x-0 md:min-h-[calc(100vh-4rem)] ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}
+    >
       {/* Overall Completion Metric Card */}
-      <div className="p-4 border-b border-slate-100 bg-slate-50/50">
-        <div className="flex items-center justify-between mb-2">
+      <div className="p-4 border-b border-slate-100 bg-slate-50/50 relative">
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-2 right-2 p-1.5 text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 rounded-lg md:hidden shadow-sm border border-slate-200"
+            title="Close sidebar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+        <div className="flex items-center justify-between mb-2 mt-1">
           <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
             Attribute 3 Progress
           </span>
