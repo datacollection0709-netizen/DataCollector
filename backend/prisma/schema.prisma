@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id           String       @id @default(uuid())
+  name         String
+  code         String       @unique
+  contactEmail String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  users        User[]
+  submissions  Submission[]
+  auditLogs    AuditLog[]
+}
+
+model User {
+  id             String          @id @default(uuid())
+  name           String
+  email          String          @unique
+  passwordHash   String
+  role           String          @default("DATA_ENTRY") // ADMIN, REVIEWER, DATA_ENTRY
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  createdSubs    Submission[]    @relation("SubmissionCreator")
+  submittedSubs  Submission[]    @relation("SubmissionSubmitter")
+  reviewedSubs   Submission[]    @relation("SubmissionReviewer")
+  uploadedDocs   Document[]
+  reviewComments ReviewComment[]
+  auditLogs      AuditLog[]
+}
+
+model Attribute {
+  id          String       @id @default(uuid())
+  code        String       @unique // "3"
+  title       String
+  description String?
+  version     Int          @default(1)
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  sections    Section[]
+  submissions Submission[]
+}
+
+model Section {
+  id           String    @id @default(uuid())
+  attributeId  String
+  attribute    Attribute @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  code         String    @unique // "3.1", "3.2", etc.
+  title        String
+  description  String?
+  displayOrder Int       @default(0)
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  fields       Field[]
+}
+
+model Field {
+  id              String            @id @default(uuid())
+  sectionId       String
+  section         Section           @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  code            String            @unique // "3.1.1", "3.4.2", etc.
+  label           String
+  description     String?
+  fieldType       String // NUMBER, DECIMAL, CURRENCY, PERCENTAGE, RATIO, TEXT, TEXTAREA, BOOLEAN, MULTI_SELECT, FILE
+  unit            String? // "Classrooms", "MBPS", "INR", "%", etc.
+  required        Boolean           @default(true)
+  proofRequired   Boolean           @default(false)
+  remarksAllowed  Boolean           @default(true)
+  validationRules String? // JSON string
+  displayOrder    Int               @default(0)
+  active          Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  values          SubmissionValue[]
+  documents       Document[]
+}
+
+model Year {
+  id           String            @id @default(uuid())
+  code         String            @unique // "2023-24", "2024-25", "2025-26"
+  displayOrder Int               @default(0)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  values       SubmissionValue[]
+  documents    Document[]
+}
+
+model Submission {
+  id              String            @id @default(uuid())
+  organizationId  String
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  attributeId     String
+  attribute       Attribute         @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  status          String            @default("DRAFT") // DRAFT, SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED
+  createdBy       String
+  creator         User              @relation("SubmissionCreator", fields: [createdBy], references: [id])
+  submittedBy     String?
+  submitter       User?             @relation("SubmissionSubmitter", fields: [submittedBy], references: [id])
+  submittedAt     DateTime?
+  reviewedBy      String?
+  reviewer        User?             @relation("SubmissionReviewer", fields: [reviewedBy], references: [id])
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  values          SubmissionValue[]
+  documents       Document[]
+  comments        ReviewComment[]
+}
+
+model SubmissionValue {
+  id               String     @id @default(uuid())
+  submissionId     String
+  submission       Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fieldId          String
+  field            Field      @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  yearId           String
+  year             Year       @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  isNotApplicable  Boolean    @default(false)
+  numericValue     Float?
+  textValue        String?
+  ratioNumerator   Float?
+  ratioDenominator Float?
+  remarks          String?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  @@unique([submissionId, fieldId, yearId])
+}
+
+model Document {
+  id               String     @id @default(uuid())
+  submissionId     String
+  submission       Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  fieldId          String
+  field            Field      @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  yearId           String?
+  year             Year?      @relation(fields: [yearId], references: [id], onDelete: SetNull)
+  originalFileName String
+  storagePath      String
+  mimeType         String
+  fileSize         Int
+  uploadedBy       String
+  uploader         User       @relation(fields: [uploadedBy], references: [id])
+  uploadedAt       DateTime   @default(now())
+}
+
+model ReviewComment {
+  id           String     @id @default(uuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  sectionCode  String?
+  fieldCode    String?
+  comment      String
+  authorId     String
+  author       User       @relation(fields: [authorId], references: [id])
+  createdAt    DateTime   @default(now())
+}
+
+model AuditLog {
+  id             String        @id @default(uuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  action         String // CREATE_DRAFT, UPDATE_VALUES, UPLOAD_DOCUMENT, DELETE_DOCUMENT, SUBMIT_FORM, APPROVE_SUBMISSION, REJECT_SUBMISSION, EXPORT_EXCEL
+  entityType     String // SUBMISSION, SUBMISSION_VALUE, DOCUMENT, USER
+  entityId       String
+  oldValue       String? // JSON or summary
+  newValue       String? // JSON or summary
+  ipAddress      String?
+  timestamp      DateTime      @default(now())
+}
