@@ -10,42 +10,58 @@ import { AuditService } from '../services/auditService';
 const router = Router();
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  name: z.string().min(1),
+  department: z.string().min(1),
 });
 
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const parseResult = loginSchema.safeParse(req.body);
     if (!parseResult.success) {
-      res.status(400).json({ success: false, message: 'Invalid email or password format.' });
+      res.status(400).json({ success: false, message: 'Name and Department are required.' });
       return;
     }
 
-    const { email, password } = parseResult.data;
+    const { name, department } = parseResult.data;
 
-    const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+    // Find or create the Organization (Department)
+    let org = await prisma.organization.findUnique({
+      where: { code: department.toLowerCase().trim() },
+    });
+
+    if (!org) {
+      org = await prisma.organization.create({
+        data: {
+          name: department.trim(),
+          code: department.toLowerCase().trim(),
+        },
+      });
+    }
+
+    // Find or create User
+    let user = await prisma.user.findFirst({
+      where: {
+        name: name.trim(),
+        organizationId: org.id,
+      },
       include: { organization: true },
     });
 
     if (!user) {
-      res.status(401).json({ success: false, message: 'Invalid credentials. Please check your email and password.' });
-      return;
-    }
-
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) {
-      res.status(401).json({ success: false, message: 'Invalid credentials. Please check your email and password.' });
-      return;
+      user = await prisma.user.create({
+        data: {
+          name: name.trim(),
+          organizationId: org.id,
+        },
+        include: { organization: true },
+      });
     }
 
     const token = jwt.sign(
       {
         id: user.id,
         name: user.name,
-        email: user.email,
-        role: user.role,
+        role: 'DATA_ENTRY', // Keep role for backwards compatibility in token
         organizationId: user.organizationId,
       },
       config.jwtSecret,
@@ -67,8 +83,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email,
-        role: user.role,
+        role: 'DATA_ENTRY',
         organizationId: user.organizationId,
         organizationName: user.organization.name,
       },
@@ -95,8 +110,6 @@ router.get('/me', authenticate, async (req: Request, res: Response): Promise<voi
       user: {
         id: user.id,
         name: user.name,
-        email: user.email,
-        role: user.role,
         organizationId: user.organizationId,
         organizationName: user.organization.name,
       },
@@ -118,8 +131,6 @@ router.get('/users', authenticate, requireRoles(['ADMIN']), async (req: Request,
       users: users.map((u) => ({
         id: u.id,
         name: u.name,
-        email: u.email,
-        role: u.role,
         organizationId: u.organizationId,
         organizationName: u.organization.name,
         createdAt: u.createdAt,

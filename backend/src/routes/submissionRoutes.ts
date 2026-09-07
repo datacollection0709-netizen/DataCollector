@@ -39,9 +39,9 @@ router.get('/', authenticate, async (req: Request, res: Response): Promise<void>
       where: whereClause,
       include: {
         organization: true,
-        creator: { select: { id: true, name: true, email: true } },
-        submitter: { select: { id: true, name: true, email: true } },
-        reviewer: { select: { id: true, name: true, email: true } },
+        creator: { select: { id: true, name: true } },
+        submitter: { select: { id: true, name: true } },
+        reviewer: { select: { id: true, name: true } },
         _count: {
           select: {
             values: true,
@@ -227,7 +227,7 @@ router.post('/:id/comments', authenticate, async (req: Request, res: Response): 
         authorId: req.user!.id,
       },
       include: {
-        author: { select: { id: true, name: true, role: true } },
+        author: { select: { id: true, name: true } },
       },
     });
 

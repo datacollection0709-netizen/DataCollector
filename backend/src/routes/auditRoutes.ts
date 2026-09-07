@@ -18,8 +18,6 @@ router.get('/', authenticate, requireRoles(['ADMIN', 'REVIEWER']), async (req: R
           select: {
             id: true,
             name: true,
-            email: true,
-            role: true,
           },
         },
       },
@@ -33,8 +31,6 @@ router.get('/', authenticate, requireRoles(['ADMIN', 'REVIEWER']), async (req: R
         id: l.id,
         userId: l.userId,
         userName: l.user.name,
-        userEmail: l.user.email,
-        userRole: l.user.role,
         action: l.action,
         entityType: l.entityType,
         entityId: l.entityId,

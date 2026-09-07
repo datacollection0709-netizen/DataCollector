@@ -6,7 +6,6 @@ import { prisma } from '../prisma';
 export interface AuthenticatedUser {
   id: string;
   name: string;
-  email: string;
   role: 'ADMIN' | 'REVIEWER' | 'DATA_ENTRY';
   organizationId: string;
 }
@@ -36,8 +35,6 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
       select: {
         id: true,
         name: true,
-        email: true,
-        role: true,
         organizationId: true,
       },
     });
@@ -50,8 +47,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
     req.user = {
       id: user.id,
       name: user.name,
-      email: user.email,
-      role: user.role as any,
+      role: 'DATA_ENTRY',
       organizationId: user.organizationId,
     };
 

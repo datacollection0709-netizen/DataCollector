@@ -49,10 +49,10 @@ class ApiClient {
   }
 
   // Auth
-  async login(email: string, password: string) {
+  async login(name: string, department: string) {
     return this.request<{ success: boolean; token: string; user: any }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ name, department }),
     });
   }
 

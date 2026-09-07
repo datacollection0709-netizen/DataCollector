@@ -403,7 +403,7 @@ export class ExcelService {
       const row = auditSheet.addRow([
         log.timestamp.toISOString().replace('T', ' ').substring(0, 19),
         log.user.name,
-        log.user.role,
+        'DATA_ENTRY',
         log.action,
         log.newValue || log.oldValue || '—',
         log.ipAddress || '127.0.0.1',

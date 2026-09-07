@@ -194,11 +194,22 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
             >
               <div className="flex justify-between items-center mb-1.5">
                 <span className="text-xs font-bold text-slate-700 font-mono">{year.code}</span>
-                {isNA && (
-                  <span className="text-[10px] font-semibold uppercase text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                    Not Applicable
-                  </span>
-                )}
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isNA}
+                    onChange={(e) => {
+                      const newNA = e.target.checked;
+                      onChange(year.code, field.code, {
+                        isNotApplicable: newNA,
+                        textValue: newNA ? '-----' : null,
+                        numericValue: newNA ? null : null,
+                      });
+                    }}
+                    className="w-3 h-3 text-amber-600 rounded border-slate-300 focus:ring-amber-500"
+                  />
+                  <span className="text-[10px] font-semibold uppercase text-slate-500">N/A</span>
+                </label>
               </div>
 
               {/* Render appropriate input */}

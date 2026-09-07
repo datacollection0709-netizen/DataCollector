@@ -6,7 +6,6 @@ export type UserRole = 'ADMIN' | 'REVIEWER' | 'DATA_ENTRY';
 export interface User {
   id: string;
   name: string;
-  email: string;
   role: UserRole;
   organizationId: string;
   organizationName?: string;
@@ -15,8 +14,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  quickLogin: (role: UserRole) => Promise<void>;
+  login: (name: string, department: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -47,27 +45,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     initAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const res = await api.login(email, password);
+  const login = async (name: string, department: string) => {
+    const res = await api.login(name, department);
     if (res.success && res.token) {
       localStorage.setItem('attribute3_token', res.token);
       setUser(res.user);
     }
-  };
-
-  const quickLogin = async (role: UserRole) => {
-    let email = 'entry@institution.edu';
-    let password = 'Entry@123';
-
-    if (role === 'REVIEWER') {
-      email = 'reviewer@institution.edu';
-      password = 'Reviewer@123';
-    } else if (role === 'ADMIN') {
-      email = 'admin@institution.edu';
-      password = 'Admin@123';
-    }
-
-    await login(email, password);
   };
 
   const logout = () => {
@@ -76,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, quickLogin, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

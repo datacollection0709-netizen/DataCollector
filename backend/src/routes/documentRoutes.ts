@@ -5,6 +5,7 @@ import { prisma } from '../prisma';
 import { authenticate } from '../middleware/auth';
 import { uploadMiddleware } from '../middleware/upload';
 import { AuditService } from '../services/auditService';
+import { GoogleService } from '../services/googleService';
 
 const router = Router();
 
@@ -49,13 +50,27 @@ router.post(
         });
       }
 
+      let storagePath = req.file.path;
+      try {
+        const driveData = await GoogleService.uploadToDrive(req.file.path, req.file.originalname, req.file.mimetype);
+        if (driveData && driveData.webViewLink) {
+          storagePath = driveData.webViewLink;
+          // Remove local file
+          if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+          }
+        }
+      } catch (err) {
+        console.warn('Google Drive upload failed, falling back to local storage', err);
+      }
+
       const doc = await prisma.document.create({
         data: {
           submissionId,
           fieldId: field.id,
           yearId: year ? year.id : null,
           originalFileName: req.file.originalname,
-          storagePath: req.file.path,
+          storagePath,
           mimeType: req.file.mimetype,
           fileSize: req.file.size,
           uploadedBy: req.user!.id,
@@ -123,6 +138,11 @@ router.get('/:id/download', authenticate, async (req: Request, res: Response): P
       doc.submission.organizationId !== req.user!.organizationId
     ) {
       res.status(403).json({ success: false, message: 'Forbidden: Access denied to this document.' });
+      return;
+    }
+
+    if (doc.storagePath.startsWith('http')) {
+      res.redirect(doc.storagePath);
       return;
     }
 

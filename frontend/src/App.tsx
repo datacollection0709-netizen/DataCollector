@@ -4,8 +4,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { SectionForm } from './pages/SectionForm';
 import { ReviewSubmission } from './pages/ReviewSubmission';
-import { ReviewerPortal } from './pages/ReviewerPortal';
-import { AdminDashboard } from './pages/AdminDashboard';
+
 import { Navbar } from './components/layout/Navbar';
 import { Sidebar } from './components/layout/Sidebar';
 import { api } from './api/client';
@@ -139,14 +138,7 @@ export const App: React.FC = () => {
             />
           )}
 
-          {activeTab === 'reviewer' && (
-            <ReviewerPortal
-              onExportExcel={handleExportExcel}
-              onRefreshAll={loadData}
-            />
-          )}
 
-          {activeTab === 'admin' && <AdminDashboard />}
         </main>
       </div>
     </div>

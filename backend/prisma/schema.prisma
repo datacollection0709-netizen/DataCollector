@@ -22,9 +22,6 @@ model Organization {
 model User {
   id             String          @id @default(uuid())
   name           String
-  email          String          @unique
-  passwordHash   String
-  role           String          @default("DATA_ENTRY") // ADMIN, REVIEWER, DATA_ENTRY
   organizationId String
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdAt      DateTime        @default(now())

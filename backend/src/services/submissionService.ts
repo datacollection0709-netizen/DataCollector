@@ -1,5 +1,9 @@
 import { prisma } from '../prisma';
 import { AuditService } from './auditService';
+import { GoogleService } from './googleService';
+import { ExcelService } from './excelService';
+import fs from 'fs';
+import path from 'path';
 
 export interface SaveDraftValueInput {
   fieldCode: string;
@@ -32,9 +36,9 @@ export class SubmissionService {
       },
       include: {
         organization: true,
-        creator: { select: { id: true, name: true, email: true } },
-        submitter: { select: { id: true, name: true, email: true } },
-        reviewer: { select: { id: true, name: true, email: true } },
+        creator: { select: { id: true, name: true } },
+        submitter: { select: { id: true, name: true } },
+        reviewer: { select: { id: true, name: true } },
         values: {
           include: {
             field: true,
@@ -50,7 +54,7 @@ export class SubmissionService {
         },
         comments: {
           include: {
-            author: { select: { id: true, name: true, role: true } },
+            author: { select: { id: true, name: true } },
           },
           orderBy: { createdAt: 'desc' },
         },
@@ -67,9 +71,9 @@ export class SubmissionService {
         },
         include: {
           organization: true,
-          creator: { select: { id: true, name: true, email: true } },
-          submitter: { select: { id: true, name: true, email: true } },
-          reviewer: { select: { id: true, name: true, email: true } },
+          creator: { select: { id: true, name: true } },
+          submitter: { select: { id: true, name: true } },
+          reviewer: { select: { id: true, name: true } },
           values: {
             include: {
               field: true,
@@ -85,7 +89,7 @@ export class SubmissionService {
           },
           comments: {
             include: {
-              author: { select: { id: true, name: true, role: true } },
+              author: { select: { id: true, name: true } },
             },
             orderBy: { createdAt: 'desc' },
           },
@@ -115,9 +119,9 @@ export class SubmissionService {
       include: {
         organization: true,
         attribute: true,
-        creator: { select: { id: true, name: true, email: true } },
-        submitter: { select: { id: true, name: true, email: true } },
-        reviewer: { select: { id: true, name: true, email: true } },
+        creator: { select: { id: true, name: true } },
+        submitter: { select: { id: true, name: true } },
+        reviewer: { select: { id: true, name: true } },
         values: {
           include: {
             field: {
@@ -137,7 +141,7 @@ export class SubmissionService {
         },
         comments: {
           include: {
-            author: { select: { id: true, name: true, role: true } },
+            author: { select: { id: true, name: true } },
           },
           orderBy: { createdAt: 'desc' },
         },
@@ -414,7 +418,7 @@ export class SubmissionService {
   static async submitForReview(submissionId: string, userId: string, userIp?: string) {
     const submission = await prisma.submission.findUnique({
       where: { id: submissionId },
-      include: { organization: true },
+      include: { organization: true, creator: true },
     });
 
     if (!submission) {
@@ -462,6 +466,27 @@ export class SubmissionService {
       newValue: 'SUBMITTED',
       ipAddress: userIp,
     });
+
+    // Formatting data for Google Sheets
+    // Generate the full institutional workbook and upload it as a Google Sheet
+    try {
+      const workbook = await ExcelService.generateAttribute3Workbook(submissionId);
+      const safeUserName = (submission.creator?.name || userId).replace(/[^a-zA-Z0-9 ]/g, '');
+      const safeOrgName = submission.organization.name.replace(/[^a-zA-Z0-9 ]/g, '');
+      const sheetTitle = `${safeUserName}_${safeOrgName}`;
+      
+      const tempPath = path.join(process.cwd(), `temp_${Date.now()}.xlsx`);
+      await workbook.xlsx.writeFile(tempPath);
+      
+      const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+      await GoogleService.uploadExcelAsSpreadsheet(tempPath, sheetTitle, spreadsheetId);
+      
+      if (fs.existsSync(tempPath)) {
+        fs.unlinkSync(tempPath);
+      }
+    } catch (e) {
+      console.error('Failed to export to Google Sheets:', e);
+    }
 
     return updated;
   }

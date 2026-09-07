@@ -168,44 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </button>
 
-        {/* Elevated Role Tools */}
-        {isElevated && (
-          <>
-            <div className="pt-3 pb-1 px-3">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Administration
-              </span>
-            </div>
 
-            <button
-              type="button"
-              onClick={() => setActiveTab('reviewer')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
-                activeTab === 'reviewer'
-                  ? 'bg-amber-50 text-amber-800 font-semibold'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-            >
-              <ClipboardList className="w-4 h-4 text-amber-600 flex-shrink-0" />
-              <span>Reviewer Panel</span>
-            </button>
-
-            {user?.role === 'ADMIN' && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('admin')}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs rounded-lg transition-colors ${
-                  activeTab === 'admin'
-                    ? 'bg-slate-100 text-slate-900 font-semibold'
-                    : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <ShieldAlert className="w-4 h-4 text-slate-600 flex-shrink-0" />
-                <span>Admin & Audit Trail</span>
-              </button>
-            )}
-          </>
-        )}
       </nav>
 
       {/* Export to Excel Button in Sidebar Footer */}

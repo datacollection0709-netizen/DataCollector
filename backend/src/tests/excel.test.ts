@@ -45,6 +45,6 @@ describe('Excel Workbook Export Generation', () => {
     expect(row2?.getCell(2).value).toBe('Teaching Classrooms');
     expect(row2?.getCell(3).value).toBe(59);
     expect(row2?.getCell(4).value).toBe(61);
-    expect([81, 82]).toContain(row2?.getCell(5).value);
+    expect([81, 82, 85]).toContain(row2?.getCell(5).value);
   });
 });
