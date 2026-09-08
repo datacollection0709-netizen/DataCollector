@@ -264,7 +264,7 @@ export class ExcelService {
 
         // Gather proofs and remarks
         const docs = docMap.get(field.code) || [];
-        const docNames = docs.map((d) => d.originalFileName);
+        const docNames = docs.map((d: any) => d.originalFileName);
         const remarks = [v1?.remarks, v2?.remarks, v3?.remarks].filter(Boolean);
 
         let proofRemarkText = '';

@@ -27,7 +27,7 @@ router.get('/', authenticate, requireRoles(['ADMIN', 'REVIEWER']), async (req: R
 
     res.json({
       success: true,
-      logs: logs.map((l) => ({
+      logs: logs.map((l: any) => ({
         id: l.id,
         userId: l.userId,
         userName: l.user.name,

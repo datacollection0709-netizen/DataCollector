@@ -202,7 +202,7 @@ export class SubmissionService {
     let completedRequired = 0;
     const missingRequiredProofs: { fieldCode: string; yearCode?: string; label: string }[] = [];
 
-    const sectionProgress = sections.map((sec) => {
+    const sectionProgress = sections.map((sec: any) => {
       let secTotalFields = 0;
       let secCompletedFields = 0;
       const missingFieldCodes: string[] = [];
@@ -302,15 +302,15 @@ export class SubmissionService {
 
     // Cache fields and years
     const allFields = await prisma.field.findMany();
-    const fieldByCode = new Map(allFields.map((f) => [f.code, f]));
+    const fieldByCode = new Map<string, any>(allFields.map((f: any) => [f.code, f]));
 
     const allYears = await prisma.year.findMany();
-    const yearByCode = new Map(allYears.map((y) => [y.code, y]));
+    const yearByCode = new Map<string, any>(allYears.map((y: any) => [y.code, y]));
 
     const modifiedAuditDetails: string[] = [];
 
     // Process in transaction
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       for (const val of valuesInput) {
         const field = fieldByCode.get(val.fieldCode);
         const year = yearByCode.get(val.yearCode);
@@ -433,15 +433,15 @@ export class SubmissionService {
 
     // Validate if any required proofs are missing
     if (progress.missingRequiredProofs.length > 0) {
-      const missingList = progress.missingRequiredProofs.map((p) => `${p.fieldCode} (${p.label})`).join(', ');
+      const missingList = progress.missingRequiredProofs.map((p: any) => `${p.fieldCode} (${p.label})`).join(', ');
       throw new Error(`Cannot submit: The following mandatory supporting documents are missing: ${missingList}`);
     }
 
     // Validate completion rate
     if (progress.overallPercentage < 100) {
       const missingSections = progress.sectionProgress
-        .filter((s) => s.missingFieldCodes.length > 0)
-        .map((s) => `${s.sectionCode} (${s.missingFieldCodes.join(', ')})`)
+        .filter((s: any) => s.missingFieldCodes.length > 0)
+        .map((s: any) => `${s.sectionCode} (${s.missingFieldCodes.join(', ')})`)
         .join('; ');
       throw new Error(`Cannot submit: Incomplete required fields in sections: ${missingSections}`);
     }

@@ -128,7 +128,7 @@ router.get('/users', authenticate, requireRoles(['ADMIN']), async (req: Request,
 
     res.json({
       success: true,
-      users: users.map((u) => ({
+      users: users.map((u: any) => ({
         id: u.id,
         name: u.name,
         organizationId: u.organizationId,
