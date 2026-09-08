@@ -114,7 +114,6 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
             </Button>
           </div>
         </div>
-      </div>
 
         {/* Missing Proofs Alert */}
         {progress?.missingRequiredProofs?.length > 0 && (
