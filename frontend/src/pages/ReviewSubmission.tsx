@@ -51,7 +51,11 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
   const valueMap = new Map<string, any>();
   if (submission?.values) {
     for (const v of submission.values) {
-      valueMap.set(`${v.field.code}_${v.year.code}`, v);
+      const fCode = v.field?.code || v.fieldCode;
+      const yCode = v.year?.code || v.yearCode;
+      if (fCode && yCode) {
+        valueMap.set(`${fCode}_${yCode}`, v);
+      }
     }
   }
 
@@ -59,9 +63,11 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
   const docMap = new Map<string, any[]>();
   if (submission?.documents) {
     for (const d of submission.documents) {
-      const list = docMap.get(d.field.code) || [];
+      const fCode = d.field?.code || d.fieldCode;
+      if (!fCode) continue;
+      const list = docMap.get(fCode) || [];
       list.push(d);
-      docMap.set(d.field.code, list);
+      docMap.set(fCode, list);
     }
   }
 

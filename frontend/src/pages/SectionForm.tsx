@@ -49,10 +49,13 @@ export const SectionForm: React.FC<SectionFormProps> = ({
     if (submission?.values) {
       const initial: Record<string, any> = {};
       for (const val of submission.values) {
-        const key = `${val.field.code}_${val.year.code}`;
+        const fCode = val.field?.code || val.fieldCode;
+        const yCode = val.year?.code || val.yearCode;
+        if (!fCode || !yCode) continue;
+        const key = `${fCode}_${yCode}`;
         initial[key] = {
-          fieldCode: val.field.code,
-          yearCode: val.year.code,
+          fieldCode: fCode,
+          yearCode: yCode,
           isNotApplicable: val.isNotApplicable,
           numericValue: val.numericValue,
           textValue: val.textValue,
