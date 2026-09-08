@@ -1,168 +1,182 @@
-/// <reference types="vite/client" />
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+import { attribute3Schema } from '../utils/schema';
+import { ExcelService } from '../utils/excelGenerator';
 
-class ApiClient {
-  private getToken(): string | null {
-    return localStorage.getItem('attribute3_token');
+class LocalApiClient {
+  // Helpers
+  private getLocalUser() {
+    const userStr = localStorage.getItem('attribute3_local_user');
+    return userStr ? JSON.parse(userStr) : null;
   }
 
-  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = this.getToken();
-    const headers: Record<string, string> = {
-      ...(options.headers as Record<string, string>),
-    };
+  private getSubmissionsData() {
+    const subsStr = localStorage.getItem('attribute3_submissions');
+    return subsStr ? JSON.parse(subsStr) : {};
+  }
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
+  private saveSubmissionsData(data: any) {
+    localStorage.setItem('attribute3_submissions', JSON.stringify(data));
+  }
 
-    if (!(options.body instanceof FormData)) {
-      headers['Content-Type'] = 'application/json';
-    }
-
-    try {
-      const response = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers,
-      });
-
-      if (!response.ok) {
-        let errorMessage = `HTTP Error ${response.status}: ${response.statusText}`;
-        try {
-          const errorData = await response.json();
-          if (errorData.message) {
-            errorMessage = errorData.message;
-          }
-        } catch {
-          // fallback to status text
-        }
-        throw new Error(errorMessage);
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      // Check if network failure
-      if (error.name === 'TypeError' && error.message.includes('fetch')) {
-        throw new Error('Network connection failed. Your entered data is kept in the browser. Please check your internet and retry.');
-      }
-      throw error;
-    }
+  private delay(ms = 300) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   // Auth
   async login(name: string, department: string) {
-    return this.request<{ success: boolean; token: string; user: any }>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ name, department }),
-    });
+    await this.delay();
+    const user = {
+      id: 'local-user-id',
+      name: name,
+      role: 'DATA_ENTRY' as const,
+      organizationId: 'local-org-id',
+      organizationName: department,
+    };
+    localStorage.setItem('attribute3_local_user', JSON.stringify(user));
+    return { success: true, token: 'local-token', user };
   }
 
   async getMe() {
-    return this.request<{ success: boolean; user: any }>('/auth/me');
+    await this.delay();
+    const user = this.getLocalUser();
+    if (user) {
+      return { success: true, user };
+    }
+    throw new Error('Not authenticated');
   }
 
   async getUsers() {
-    return this.request<{ success: boolean; users: any[] }>('/auth/users');
+    return { success: true, users: [this.getLocalUser()].filter(Boolean) };
   }
 
   // Attributes
   async getAttribute(code = '3') {
-    return this.request<{ success: boolean; attribute: any; years: any[] }>(`/attributes/${code}`);
+    await this.delay();
+    if (code === '3') {
+      return attribute3Schema;
+    }
+    throw new Error('Attribute not found');
   }
 
   // Submissions
   async getSubmissions() {
-    return this.request<{ success: boolean; submissions: any[] }>('/submissions');
+    await this.delay();
+    const subs = this.getSubmissionsData();
+    const list = Object.values(subs).map((sub: any) => ({
+      id: sub.id,
+      status: sub.status,
+      updatedAt: sub.updatedAt,
+      attribute: { title: 'Attribute 3: Infrastructure and Learning Resources' }
+    }));
+    return { success: true, submissions: list };
   }
 
   async getCurrentSubmission() {
-    return this.request<{ success: boolean; submission: any; progress: any }>('/submissions/current');
+    await this.delay();
+    const subs = this.getSubmissionsData();
+    let current: any = Object.values(subs).find((s: any) => s.status === 'DRAFT');
+    
+    if (!current) {
+      current = {
+        id: `sub-${Date.now()}`,
+        status: 'DRAFT',
+        values: [],
+        documents: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      subs[current.id] = current;
+      this.saveSubmissionsData(subs);
+    }
+    
+    return { success: true, submission: current, progress: { total: 0, completed: 0, percentage: 0 } };
   }
 
   async getSubmissionById(id: string) {
-    return this.request<{ success: boolean; submission: any; progress: any }>(`/submissions/${id}`);
+    await this.delay();
+    const subs = this.getSubmissionsData();
+    if (subs[id]) {
+      return { success: true, submission: subs[id], progress: { total: 0, completed: 0, percentage: 0 } };
+    }
+    throw new Error('Submission not found');
   }
 
   async saveDraft(id: string, values: any[]) {
-    return this.request<{ success: boolean; savedAt: string; progress: any }>(`/submissions/${id}/draft`, {
-      method: 'POST',
-      body: JSON.stringify({ values }),
-    });
+    await this.delay(500); // Simulate network
+    const subs = this.getSubmissionsData();
+    if (!subs[id]) {
+      subs[id] = { id, status: 'DRAFT', values: [], documents: [] };
+    }
+    subs[id].values = values;
+    subs[id].updatedAt = new Date().toISOString();
+    this.saveSubmissionsData(subs);
+    return { success: true, savedAt: new Date().toISOString(), progress: { total: 0, completed: 0, percentage: 0 } };
   }
 
   async submitForReview(id: string) {
-    return this.request<{ success: boolean; message: string; submission: any }>(`/submissions/${id}/submit`, {
-      method: 'POST',
-    });
+    await this.delay();
+    const subs = this.getSubmissionsData();
+    if (subs[id]) {
+      subs[id].status = 'SUBMITTED';
+      this.saveSubmissionsData(subs);
+      return { success: true, message: 'Submitted successfully', submission: subs[id] };
+    }
+    throw new Error('Submission not found');
   }
 
   async reviewSubmission(id: string, action: 'APPROVE' | 'REJECT', reason?: string) {
-    return this.request<{ success: boolean; message: string; submission: any }>(`/submissions/${id}/review`, {
-      method: 'POST',
-      body: JSON.stringify({ action, reason }),
-    });
+    await this.delay();
+    const subs = this.getSubmissionsData();
+    if (subs[id]) {
+      subs[id].status = action === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+      this.saveSubmissionsData(subs);
+      return { success: true, message: 'Review recorded', submission: subs[id] };
+    }
+    throw new Error('Submission not found');
   }
 
   async addComment(id: string, comment: string, sectionCode?: string, fieldCode?: string) {
-    return this.request<{ success: boolean; comment: any }>(`/submissions/${id}/comments`, {
-      method: 'POST',
-      body: JSON.stringify({ comment, sectionCode, fieldCode }),
-    });
+    await this.delay();
+    return { success: true, comment: { id: Date.now().toString(), comment, sectionCode, fieldCode, createdAt: new Date() } };
   }
 
-  // Documents
+  // Documents (Mocked since we can't save files locally easily without IndexedDB)
   async uploadDocument(formData: FormData) {
-    return this.request<{ success: boolean; message: string; document: any }>('/documents/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    await this.delay();
+    const file = formData.get('file') as File | null;
+    return { success: true, message: 'File saved locally', document: { id: Date.now().toString(), originalFileName: file?.name || 'document.pdf' } };
   }
 
   async deleteDocument(id: string) {
-    return this.request<{ success: boolean; message: string }>(`/documents/${id}`, {
-      method: 'DELETE',
-    });
+    await this.delay();
+    return { success: true, message: 'Document deleted' };
   }
 
   downloadDocumentUrl(id: string): string {
-    const token = this.getToken();
-    return `${API_BASE}/documents/${id}/download?token=${token}`;
+    return '#';
   }
 
   async downloadExcel(submissionId: string, filename = 'Attribute_3_Report.xlsx') {
-    const token = this.getToken();
-    const response = await fetch(`${API_BASE}/submissions/${submissionId}/export`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const subs = this.getSubmissionsData();
+    const sub = subs[submissionId];
+    if (!sub) throw new Error('Submission not found');
 
-    if (!response.ok) {
-      throw new Error('Failed to download Excel report.');
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const user = this.getLocalUser();
+    await ExcelService.generateAndDownloadAttribute3Workbook(
+      sub.values,
+      user?.name || 'Local User',
+      user?.organizationName || 'Department'
+    );
   }
 
   // Audit
   async getAuditLogs(submissionId?: string) {
-    const q = submissionId ? `?submissionId=${submissionId}` : '';
-    return this.request<{ success: boolean; logs: any[] }>(`/audit${q}`);
+    return { success: true, logs: [] };
   }
 
   // Health
   async getHealth() {
-    const res = await fetch('/health');
-    return res.json();
+    return { status: 'Healthy (Local Frontend Mode)', timestamp: new Date().toISOString() };
   }
 }
 
-export const api = new ApiClient();
+export const api = new LocalApiClient();
