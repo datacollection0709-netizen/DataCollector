@@ -53,23 +53,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
     return val.toLocaleString('en-IN');
   };
 
-  // Check cross-year variance
-  const checkVarianceWarning = (): string | null => {
-    if (field.fieldType !== 'NUMBER' && field.fieldType !== 'CURRENCY') return null;
-    const nums = years.map((y) => values[y.code]?.numericValue).filter((n) => typeof n === 'number') as number[];
-    if (nums.length >= 2) {
-      for (let i = 1; i < nums.length; i++) {
-        const prev = nums[i - 1];
-        const curr = nums[i];
-        if (prev > 0 && (curr / prev > 3 || curr / prev < 0.33)) {
-          return `Large variance detected (${prev} -> ${curr}). Please verify this figure.`;
-        }
-      }
-    }
-    return null;
-  };
-
-  const varianceWarning = checkVarianceWarning();
+  const varianceWarning = null;
 
   // Helper to toggle Not Applicable for all years
   const toggleAllNA = () => {
@@ -171,13 +155,6 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
         </div>
       </div>
 
-      {/* Cross-Year Variance Warning */}
-      {varianceWarning && (
-        <div className="flex items-center gap-2 px-3 py-1.5 mb-3 bg-amber-50 border border-amber-200 rounded text-xs text-amber-800">
-          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-          <span>{varianceWarning}</span>
-        </div>
-      )}
 
       {/* Year-Wise Grid Inputs */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -233,7 +210,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                         isNotApplicable: false,
                       });
                     }}
-                    className="table-cell-input text-right font-mono"
+                    className="table-cell-input text-right font-mono text-base"
                   />
                   {field.unit && (
                     <span className="absolute left-2.5 top-2 text-[11px] text-slate-400 pointer-events-none">
@@ -259,7 +236,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                         isNotApplicable: false,
                       });
                     }}
-                    className="table-cell-input pl-6 text-right font-mono font-medium text-slate-800"
+                    className="table-cell-input pl-6 text-right font-mono font-medium text-base text-slate-800"
                   />
                 </div>
               ) : field.fieldType === 'PERCENTAGE' ? (
@@ -279,7 +256,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                         isNotApplicable: false,
                       });
                     }}
-                    className="table-cell-input pr-7 text-right font-mono"
+                    className="table-cell-input pr-7 text-right font-mono text-base"
                   />
                   <span className="absolute right-2.5 top-2 text-xs text-slate-500 font-bold pointer-events-none">
                     %
@@ -388,7 +365,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                         isNotApplicable: false,
                       })
                     }
-                    className="table-cell-input text-xs"
+                    className="table-cell-input text-sm"
                   />
                   <div className="flex flex-wrap gap-1 mt-1">
                     {['Virtual Labs', 'AR/VR', 'Media Center'].map((tag) => (

@@ -138,8 +138,8 @@ export const SectionForm: React.FC<SectionFormProps> = ({
   const prevCode = currentIndex > 0 ? sectionCodes[currentIndex - 1] : null;
   const nextCode = currentIndex < sectionCodes.length - 1 ? sectionCodes[currentIndex + 1] : null;
 
-  const handleNext = async () => {
-    await saveCurrentDraft();
+  const handleNext = () => {
+    saveCurrentDraft(); // don't await, just trigger save
     if (nextCode) {
       onNavigateSection(nextCode);
     } else {
@@ -147,8 +147,8 @@ export const SectionForm: React.FC<SectionFormProps> = ({
     }
   };
 
-  const handlePrev = async () => {
-    await saveCurrentDraft();
+  const handlePrev = () => {
+    saveCurrentDraft();
     if (prevCode) {
       onNavigateSection(prevCode);
     }
@@ -205,16 +205,6 @@ export const SectionForm: React.FC<SectionFormProps> = ({
             )}
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => saveCurrentDraft()}
-            disabled={isSaving}
-            leftIcon={<Save className="w-3.5 h-3.5" />}
-          >
-            Save Draft
-          </Button>
-
           {nextCode ? (
             <Button
               variant="primary"
@@ -222,7 +212,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
               onClick={handleNext}
               rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
             >
-              Save & Next
+              Next Section
             </Button>
           ) : (
             <Button
@@ -231,7 +221,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
               onClick={handleNext}
               rightIcon={<CheckSquare className="w-3.5 h-3.5" />}
             >
-              Review & Submit
+              Finish & Review
             </Button>
           )}
         </div>
@@ -284,16 +274,6 @@ export const SectionForm: React.FC<SectionFormProps> = ({
         )}
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => saveCurrentDraft()}
-            disabled={isSaving}
-            leftIcon={<Save className="w-3.5 h-3.5" />}
-          >
-            Save Draft
-          </Button>
-
           {nextCode ? (
             <Button
               variant="primary"
@@ -301,7 +281,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
               onClick={handleNext}
               rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
             >
-              Save & Continue to {nextCode}
+              Continue to {nextCode}
             </Button>
           ) : (
             <Button
@@ -310,7 +290,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
               onClick={onNavigateReview}
               rightIcon={<CheckSquare className="w-3.5 h-3.5" />}
             >
-              Proceed to Final Review
+              Finish Data Entry
             </Button>
           )}
         </div>

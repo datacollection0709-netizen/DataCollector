@@ -107,13 +107,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
               Export Excel Workbook
             </Button>
 
-            <Button
+              <Button
               variant="primary"
               size="sm"
               onClick={onNavigateReview}
               rightIcon={<ArrowRight className="w-4 h-4" />}
             >
-              Final Review & Submit
+              Final Review & Export
             </Button>
           </div>
         </div>

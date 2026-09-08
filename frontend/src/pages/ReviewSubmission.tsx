@@ -112,36 +112,9 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
             >
               Export Excel Report
             </Button>
-
-            {submission?.status === 'DRAFT' || submission?.status === 'REJECTED' ? (
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setShowConfirmModal(true)}
-                disabled={!isReadyToSubmit}
-                leftIcon={<Send className="w-4 h-4" />}
-              >
-                Submit for Final Review
-              </Button>
-            ) : null}
           </div>
         </div>
-
-        {/* Submission Success Alert */}
-        {submitSuccess && (
-          <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="font-bold text-sm">Attribute 3 Submitted Successfully!</div>
-              <p className="text-xs text-emerald-700 mt-1">
-                Your data collection packet has been officially locked and transmitted for institutional committee review.
-              </p>
-              <div className="text-[11px] text-emerald-600 font-mono mt-2">
-                Submission ID: {submission.id} &bull; Timestamp: {new Date().toLocaleString()}
-              </div>
-            </div>
-          </div>
-        )}
+      </div>
 
         {/* Missing Proofs Alert */}
         {progress?.missingRequiredProofs?.length > 0 && (
@@ -309,55 +282,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
         })}
       </div>
 
-      {/* Confirmation Modal before Submit */}
-      <Modal
-        isOpen={showConfirmModal}
-        onClose={() => setShowConfirmModal(false)}
-        title="Confirm Attribute 3 Submission"
-        maxWidth="md"
-      >
-        <div className="space-y-4">
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <div className="font-bold">Important Notice Regarding Submission:</div>
-              <p className="mt-1 leading-relaxed">
-                Once submitted, this data collection workbook will be locked for editing and transmitted to the Institutional Reviewer. You will not be able to modify fields unless the reviewer requests corrections.
-              </p>
-            </div>
-          </div>
 
-          <p className="text-xs text-slate-600">
-            Are you sure all entries for 2023–24, 2024–25, and 2025–26 are verified and all mandatory supporting documents are attached?
-          </p>
-
-          {submitError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded text-xs text-rose-700">
-              {submitError}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowConfirmModal(false)}
-              disabled={isSubmitting}
-            >
-              Go Back
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleFinalSubmit}
-              isLoading={isSubmitting}
-              leftIcon={<Send className="w-3.5 h-3.5" />}
-            >
-              Yes, Submit Attribute 3
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };
