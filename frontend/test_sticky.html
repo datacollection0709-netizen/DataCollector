@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { margin: 0; padding: 0; }
+  .navbar { height: 64px; background: blue; position: sticky; top: 0; width: 100%; z-index: 50; }
+  .container { display: flex; background: lightgray; }
+  .sidebar { width: 250px; background: red; height: calc(100vh - 64px); position: sticky; top: 64px; z-index: 30; }
+  .main { flex: 1; height: 2000px; background: yellow; padding: 20px; }
+</style>
+</head>
+<body>
+  <div class="navbar">Navbar</div>
+  <div class="container">
+    <div class="sidebar">Sidebar (Sticky)</div>
+    <div class="main">Main Content (Tall)</div>
+  </div>
+</body>
+</html>
