@@ -28,3 +28,13 @@
 .table-cell-input {
   @apply w-full px-3 py-1.5 text-sm bg-white border border-slate-200 rounded focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all;
 }
+
+/* Hide spinners for number inputs */
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+}

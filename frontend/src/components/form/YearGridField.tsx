@@ -169,9 +169,9 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                 isNA ? 'bg-slate-100 border-slate-200 opacity-65' : 'bg-slate-50/50 border-slate-200'
               }`}
             >
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-xs font-bold text-slate-700 font-mono">{year.code}</span>
-                <label className="flex items-center gap-1 cursor-pointer">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-bold text-slate-800 font-mono">{year.code}</span>
+                <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-200/50 px-1.5 py-0.5 rounded transition-colors">
                   <input
                     type="checkbox"
                     checked={isNA}
@@ -183,9 +183,9 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                         numericValue: newNA ? null : null,
                       });
                     }}
-                    className="w-3 h-3 text-amber-600 rounded border-slate-300 focus:ring-amber-500"
+                    className="w-3.5 h-3.5 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
                   />
-                  <span className="text-[10px] font-semibold uppercase text-slate-500">N/A</span>
+                  <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">N/A</span>
                 </label>
               </div>
 
@@ -195,7 +195,12 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                   -----
                 </div>
               ) : field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL' ? (
-                <div className="relative">
+                <div className="flex items-center bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
+                  {field.unit && (
+                    <div className="pl-3 pr-2 py-1.5 bg-slate-50 border-r border-slate-200 text-xs text-slate-500 font-medium select-none whitespace-nowrap">
+                      {field.unit.split(' ')[0]}
+                    </div>
+                  )}
                   <input
                     type="number"
                     step={field.fieldType === 'DECIMAL' ? '0.01' : '1'}
@@ -210,19 +215,14 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                         isNotApplicable: false,
                       });
                     }}
-                    className="table-cell-input text-right font-mono text-base"
+                    className="w-full bg-transparent border-0 py-1.5 px-3 text-right font-mono text-base focus:ring-0 outline-none placeholder:text-slate-300 placeholder:text-sm placeholder:font-sans"
                   />
-                  {field.unit && (
-                    <span className="absolute left-2.5 top-2 text-[11px] text-slate-400 pointer-events-none">
-                      {field.unit.split(' ')[0]}
-                    </span>
-                  )}
                 </div>
               ) : field.fieldType === 'CURRENCY' ? (
-                <div className="relative">
-                  <span className="absolute left-2.5 top-2 text-xs text-slate-500 font-semibold pointer-events-none">
+                <div className="flex items-center bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
+                  <div className="pl-3 pr-2 py-1.5 bg-slate-50 border-r border-slate-200 text-sm text-slate-500 font-medium select-none whitespace-nowrap">
                     ₹
-                  </span>
+                  </div>
                   <input
                     type="text"
                     placeholder="0"
@@ -236,11 +236,11 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                         isNotApplicable: false,
                       });
                     }}
-                    className="table-cell-input pl-6 text-right font-mono font-medium text-base text-slate-800"
+                    className="w-full bg-transparent border-0 py-1.5 px-3 text-right font-mono text-base font-medium text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-sans placeholder:font-normal"
                   />
                 </div>
               ) : field.fieldType === 'PERCENTAGE' ? (
-                <div className="relative">
+                <div className="flex items-center bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
                   <input
                     type="number"
                     step="0.01"
@@ -256,17 +256,17 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                         isNotApplicable: false,
                       });
                     }}
-                    className="table-cell-input pr-7 text-right font-mono text-base"
+                    className="w-full bg-transparent border-0 py-1.5 px-3 text-right font-mono text-base text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-sans placeholder:text-sm"
                   />
-                  <span className="absolute right-2.5 top-2 text-xs text-slate-500 font-bold pointer-events-none">
+                  <div className="pr-3 pl-2 py-1.5 bg-slate-50 border-l border-slate-200 text-sm text-slate-500 font-bold select-none whitespace-nowrap">
                     %
-                  </span>
+                  </div>
                 </div>
               ) : field.fieldType === 'RATIO' ? (
-                <div className="space-y-1.5">
-                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                    <div>
-                      <label className="text-slate-400 block text-[10px]">Students</label>
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
+                      <label className="block text-[10px] text-center bg-slate-50 border-b border-slate-100 py-1 text-slate-500 font-semibold uppercase tracking-wider">Students</label>
                       <input
                         type="number"
                         placeholder="Enrolled"
@@ -284,11 +284,11 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                             numericValue: n && denom ? Math.round(n / denom) : null,
                           });
                         }}
-                        className="table-cell-input text-xs font-mono py-1 px-2"
+                        className="w-full bg-transparent border-0 py-1.5 px-2 text-center text-sm font-mono focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-sans"
                       />
                     </div>
-                    <div>
-                      <label className="text-slate-400 block text-[10px]">Computers</label>
+                    <div className="bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
+                      <label className="block text-[10px] text-center bg-slate-50 border-b border-slate-100 py-1 text-slate-500 font-semibold uppercase tracking-wider">Computers</label>
                       <input
                         type="number"
                         placeholder="Available"
@@ -306,12 +306,12 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                             numericValue: num && d ? Math.round(num / d) : null,
                           });
                         }}
-                        className="table-cell-input text-xs font-mono py-1 px-2"
+                        className="w-full bg-transparent border-0 py-1.5 px-2 text-center text-sm font-mono focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-sans"
                       />
                     </div>
                   </div>
                   {val.textValue && (
-                    <div className="text-[11px] font-mono text-center font-semibold text-brand-700 bg-brand-50 py-0.5 rounded border border-brand-200">
+                    <div className="text-[11px] font-mono text-center font-semibold text-brand-700 bg-brand-50 py-1 rounded border border-brand-200">
                       Ratio: {val.textValue}
                     </div>
                   )}
