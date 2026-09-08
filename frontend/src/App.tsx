@@ -85,10 +85,10 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
       <Navbar submissionId={submission?.id} onExportExcel={handleExportExcel} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto relative">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto relative overflow-hidden">
         {/* Mobile Sidebar Overlay */}
         {isSidebarOpen && (
           <div 

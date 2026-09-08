@@ -19,15 +19,18 @@ const puppeteer = require('puppeteer');
     // Click on Section 3.1 to load a tall page
     await page.evaluate(() => {
       const btns = Array.from(document.querySelectorAll('button'));
-      const btn = btns.find(b => b.textContent && b.textContent.includes('Physical Infrastructure'));
+      const btn = btns.find(b => b.textContent && b.textContent.includes('Continue Data Entry'));
       if (btn) btn.click();
     });
     
     await new Promise(r => setTimeout(r, 1000));
     
-    // Scroll down by 800px to simulate user scrolling
+    // Scroll down by 800px on the main container
     await page.evaluate(() => {
-      window.scrollBy(0, 800);
+      const main = document.querySelector('main');
+      if (main) {
+        main.scrollBy(0, 800);
+      }
     });
     
     await new Promise(r => setTimeout(r, 500));
