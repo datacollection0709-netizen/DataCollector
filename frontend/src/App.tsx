@@ -85,10 +85,10 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="h-screen bg-slate-50 flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex flex-col">
       <Navbar submissionId={submission?.id} onExportExcel={handleExportExcel} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto relative overflow-hidden">
+      <div className="flex-1 flex max-w-7xl w-full mx-auto relative">
         {/* Mobile Sidebar Overlay */}
         {isSidebarOpen && (
           <div 
@@ -110,7 +110,7 @@ export const App: React.FC = () => {
           onClose={() => setIsSidebarOpen(false)}
         />
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl overflow-y-auto w-full">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-5xl w-full">
           {errorMsg && (
             <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
               {errorMsg}

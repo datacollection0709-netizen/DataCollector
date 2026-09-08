@@ -62,7 +62,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
     years.forEach((y) => {
       onChange(y.code, field.code, {
         isNotApplicable: newNA,
-        textValue: newNA ? '-----' : null,
+        textValue: newNA ? 'N/A' : null,
         numericValue: newNA ? null : null,
       });
     });
@@ -191,8 +191,8 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
 
               {/* Render appropriate input */}
               {isNA ? (
-                <div className="py-2 text-center text-xs font-mono text-slate-400 font-medium tracking-widest bg-white rounded border border-dashed border-slate-300">
-                  -----
+                <div className="py-2 text-center text-xs font-mono text-slate-400 font-bold tracking-widest bg-slate-50 rounded border border-dashed border-slate-300">
+                  N/A
                 </div>
               ) : field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL' ? (
                 <div className="flex items-center bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">

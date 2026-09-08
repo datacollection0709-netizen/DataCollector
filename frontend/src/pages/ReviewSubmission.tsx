@@ -139,6 +139,23 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
             </div>
           </div>
         )}
+
+        {/* Submit Actions */}
+        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+          {submitError && (
+            <span className="text-rose-600 text-sm font-medium mr-auto">{submitError}</span>
+          )}
+          {submitSuccess && (
+            <span className="text-emerald-600 text-sm font-medium mr-auto">Successfully submitted to Google Sheets!</span>
+          )}
+          <Button
+            onClick={handleFinalSubmit}
+            isLoading={isSubmitting}
+            leftIcon={<Send className="w-4 h-4" />}
+          >
+            Submit to Admin
+          </Button>
+        </div>
       </div>
 
       {/* Sections Review Accordions */}
