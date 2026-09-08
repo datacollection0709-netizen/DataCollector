@@ -113,14 +113,45 @@ class LocalApiClient {
   }
 
   async submitForReview(id: string) {
-    await this.delay();
     const subs = this.getSubmissionsData();
-    if (subs[id]) {
-      subs[id].status = 'SUBMITTED';
-      this.saveSubmissionsData(subs);
-      return { success: true, message: 'Submitted successfully', submission: subs[id] };
+    if (!subs[id]) throw new Error('Submission not found');
+
+    const sub = subs[id];
+    const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
+
+    if (GOOGLE_SCRIPT_URL) {
+      const user = this.getLocalUser();
+      
+      const payload = {
+        action: 'submitForm',
+        userName: user?.name || 'Local User',
+        department: user?.organizationName || 'Department',
+        submissionData: sub.values,
+        documents: sub.documents || []
+      };
+
+      try {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        });
+
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to submit to Google Sheets');
+        }
+      } catch (err) {
+        console.error('GAS Submit Error:', err);
+        throw new Error('Failed to submit data to Google Sheets. Check your Apps Script deployment.');
+      }
+    } else {
+      await this.delay(); // Mock delay
     }
-    throw new Error('Submission not found');
+
+    sub.status = 'SUBMITTED';
+    this.saveSubmissionsData(subs);
+    return { success: true, message: 'Submitted successfully', submission: sub };
   }
 
   async reviewSubmission(id: string, action: 'APPROVE' | 'REJECT', reason?: string) {
@@ -139,19 +170,110 @@ class LocalApiClient {
     return { success: true, comment: { id: Date.now().toString(), comment, sectionCode, fieldCode, createdAt: new Date() } };
   }
 
-  // Documents (Mocked since we can't save files locally easily without IndexedDB)
+  // Documents
   async uploadDocument(formData: FormData) {
-    await this.delay();
     const file = formData.get('file') as File | null;
-    return { success: true, message: 'File saved locally', document: { id: Date.now().toString(), originalFileName: file?.name || 'document.pdf' } };
+    const submissionId = formData.get('submissionId') as string;
+    const fieldCode = formData.get('fieldCode') as string;
+    const yearCode = formData.get('yearCode') as string | null;
+
+    if (!file || !submissionId) throw new Error('Missing file or submissionId');
+
+    let fileUrl = '#';
+    let fileId = Date.now().toString();
+
+    const GOOGLE_SCRIPT_URL = import.meta.env.VITE_GOOGLE_SCRIPT_URL;
+
+    if (GOOGLE_SCRIPT_URL) {
+      // Convert to base64
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+      });
+
+      const user = this.getLocalUser();
+
+      const payload = {
+        action: 'uploadFile',
+        fileName: file.name,
+        mimeType: file.type,
+        base64Data: base64Data,
+        userName: user?.name || 'Local User',
+        department: user?.organizationName || 'Department'
+      };
+
+      try {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload),
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        });
+
+        const data = await response.json();
+        if (!data.success) throw new Error(data.error || 'Failed to upload to Google Drive');
+
+        fileId = data.fileId;
+        fileUrl = data.fileUrl;
+      } catch (err) {
+        console.error('GAS Upload Error:', err);
+        throw new Error('Failed to upload file to Google Drive. Check your Apps Script deployment.');
+      }
+    } else {
+      await this.delay(); // Mock delay
+    }
+
+    // Save to local submission data
+    const subs = this.getSubmissionsData();
+    if (!subs[submissionId]) {
+      subs[submissionId] = { id: submissionId, status: 'DRAFT', values: [], documents: [] };
+    }
+    if (!subs[submissionId].documents) {
+      subs[submissionId].documents = [];
+    }
+
+    const doc = {
+      id: fileId,
+      fieldCode,
+      yearCode,
+      originalFileName: file.name,
+      fileSize: file.size,
+      mimeType: file.type,
+      uploadedAt: new Date().toISOString(),
+      fileUrl: fileUrl
+    };
+
+    subs[submissionId].documents.push(doc);
+    this.saveSubmissionsData(subs);
+
+    return { success: true, message: 'File uploaded', document: doc };
   }
 
   async deleteDocument(id: string) {
     await this.delay();
+    const subs = this.getSubmissionsData();
+    // We would need to search across all submissions to delete the document locally
+    for (const subId in subs) {
+      if (subs[subId].documents) {
+        subs[subId].documents = subs[subId].documents.filter((d: any) => d.id !== id);
+      }
+    }
+    this.saveSubmissionsData(subs);
     return { success: true, message: 'Document deleted' };
   }
 
   downloadDocumentUrl(id: string): string {
+    const subs = this.getSubmissionsData();
+    for (const subId in subs) {
+      const doc = subs[subId].documents?.find((d: any) => d.id === id);
+      if (doc && doc.fileUrl && doc.fileUrl !== '#') {
+        return doc.fileUrl;
+      }
+    }
     return '#';
   }
 
