@@ -719,59 +719,61 @@ class LocalApiClient {
 
     const base64Data = dataUrl.includes('base64,') ? dataUrl.split('base64,')[1] : '';
 
-    // Upload to official Google Drive via Google Apps Script (DriveApp.createFile) - GENUINE DRIVE STORAGE!
+    // Upload to official Google Drive via Google Drive API v3 or Apps Script
     let cloudUrl = '';
     let driveFileId = '';
     let uploadError = '';
 
-    // Attempt 1: Direct fetch to Google Apps Script
+    // Attempt 1: Serverless Google Drive API (/api/upload with Service Account or Web App)
     try {
-      const gRes = await fetch(googleScriptUrl, {
+      const proxyRes = await fetch('/api/upload', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'uploadFile',
           fileName: file.name,
           mimeType: file.type || 'application/octet-stream',
           base64Data,
+          googleScriptUrl,
           userName: user?.name || 'Institutional Officer',
           department: user?.organizationName || 'Attribute 3',
         }),
       });
-      const gJson = await gRes.json();
-      if (gJson?.fileUrl) {
-        cloudUrl = gJson.fileUrl;
-        driveFileId = gJson.fileId || `drive-${Date.now()}`;
-      } else if (gJson?.error) {
-        uploadError = gJson.error;
+      const proxyJson = await proxyRes.json();
+      if (proxyJson?.fileUrl) {
+        cloudUrl = proxyJson.fileUrl;
+        driveFileId = proxyJson.fileId || `drive-${Date.now()}`;
+      } else if (proxyJson?.error) {
+        uploadError = proxyJson.error;
       }
-    } catch (e: any) {
-      // Attempt 2: Serverless proxy /api/upload
-      try {
-        const proxyRes = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            googleScriptUrl,
-            action: 'uploadFile',
-            fileName: file.name,
-            mimeType: file.type || 'application/octet-stream',
-            base64Data,
-            userName: user?.name || 'Institutional Officer',
-            department: user?.organizationName || 'Attribute 3',
-          }),
-        });
-        const proxyJson = await proxyRes.json();
-        if (proxyJson?.fileUrl) {
-          cloudUrl = proxyJson.fileUrl;
-          driveFileId = proxyJson.fileId || `drive-${Date.now()}`;
-        } else if (proxyJson?.error) {
-          uploadError = proxyJson.error;
+    } catch (proxyErr: any) {
+      // Attempt 2: Direct fetch to Google Apps Script if /api/upload is unreachable (e.g. offline dev)
+      if (googleScriptUrl) {
+        try {
+          const gRes = await fetch(googleScriptUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8',
+            },
+            body: JSON.stringify({
+              action: 'uploadFile',
+              fileName: file.name,
+              mimeType: file.type || 'application/octet-stream',
+              base64Data,
+              userName: user?.name || 'Institutional Officer',
+              department: user?.organizationName || 'Attribute 3',
+            }),
+          });
+          const gJson = await gRes.json();
+          if (gJson?.fileUrl) {
+            cloudUrl = gJson.fileUrl;
+            driveFileId = gJson.fileId || `drive-${Date.now()}`;
+          } else if (gJson?.error) {
+            uploadError = gJson.error;
+          }
+        } catch (e: any) {
+          uploadError = e?.message || proxyErr?.message || 'Network error connecting to Google Drive';
         }
-      } catch (proxyErr: any) {
-        uploadError = e?.message || proxyErr?.message || 'Network error connecting to Google Apps Script';
       }
     }
 

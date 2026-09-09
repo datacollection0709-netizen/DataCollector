@@ -7,5 +7,8 @@
     "dev": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build && node -e \"const fs = require('fs'); fs.cpSync('frontend/dist', 'dist', {recursive: true});\"",
     "postinstall": "npm --prefix frontend install"
+  },
+  "dependencies": {
+    "googleapis": "^178.1.1"
   }
 }
