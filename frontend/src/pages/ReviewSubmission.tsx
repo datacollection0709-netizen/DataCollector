@@ -48,15 +48,25 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
     setCollapsedSections((prev) => ({ ...prev, [code]: !prev[code] }));
   };
 
-  // Map values
+  // Map values with multi-source fallback
   const valueMap = new Map<string, any>();
-  if (submission?.values) {
-    for (const v of submission.values) {
-      const fCode = v.field?.code || v.fieldCode;
-      const yCode = v.year?.code || v.yearCode;
-      if (fCode && yCode) {
-        valueMap.set(`${fCode}_${yCode}`, v);
-      }
+  let valuesSource = submission?.values || [];
+  if (valuesSource.length === 0) {
+    const raw = localStorage.getItem('attribute3_current_values');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        valuesSource = Array.isArray(parsed) ? parsed : Object.values(parsed);
+      } catch (e) {}
+    }
+  }
+
+  for (const v of valuesSource) {
+    if (!v) continue;
+    const fCode = v.field?.code || v.fieldCode;
+    const yCode = v.year?.code || v.yearCode;
+    if (fCode && yCode) {
+      valueMap.set(`${fCode}_${yCode}`, v);
     }
   }
 

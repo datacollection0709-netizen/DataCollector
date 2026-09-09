@@ -54,9 +54,8 @@ export const App: React.FC = () => {
   }, [user]);
 
   const handleExportExcel = async () => {
-    if (!submission?.id) return;
     try {
-      await api.downloadExcel(submission.id, `Attribute_3_${submission.organization?.code || 'Export'}.xlsx`);
+      await api.downloadExcel(submission?.id);
     } catch (err: any) {
       alert('Excel export error: ' + err.message);
     }

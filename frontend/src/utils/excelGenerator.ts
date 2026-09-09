@@ -23,31 +23,50 @@ export class ExcelService {
 
     // Map values: index by all possible keys to ensure we NEVER miss an entry
     const valueMap = new Map<string, any>();
-    if (submissionData && Array.isArray(submissionData)) {
-      for (const val of submissionData) {
-        if (!val) continue;
-        const fCode = val.fieldCode || val.field?.code;
-        const yCode = val.yearCode || val.year?.code;
-        const fId = val.fieldId || val.field?.id;
-        const yId = val.yearId || val.year?.id;
+    const dataList = Array.isArray(submissionData)
+      ? submissionData
+      : submissionData && typeof submissionData === 'object'
+      ? Object.values(submissionData)
+      : [];
 
-        if (fCode && yCode) valueMap.set(`${fCode}_${yCode}`, val);
-        if (fId && yId) valueMap.set(`${fId}_${yId}`, val);
-        if (fCode && yId) valueMap.set(`${fCode}_${yId}`, val);
-        if (fId && yCode) valueMap.set(`${fId}_${yCode}`, val);
+    for (const val of dataList) {
+      if (!val || typeof val !== 'object') continue;
+      const fCode = val.fieldCode || val.field?.code;
+      const yCode = val.yearCode || val.year?.code;
+      const fId = val.fieldId || val.field?.id;
+      const yId = val.yearId || val.year?.id;
+
+      if (fCode && yCode) {
+        const cleanY = String(yCode).replace('y-', '');
+        valueMap.set(`${fCode}_${cleanY}`, val);
+        valueMap.set(`${fCode}_y-${cleanY}`, val);
+        valueMap.set(`${fCode}_${yCode}`, val);
       }
+      if (fId && yCode) {
+        const cleanY = String(yCode).replace('y-', '');
+        valueMap.set(`${fId}_${cleanY}`, val);
+        valueMap.set(`${fId}_y-${cleanY}`, val);
+        valueMap.set(`${fId}_${yCode}`, val);
+      }
+      if (fCode && yId) valueMap.set(`${fCode}_${yId}`, val);
+      if (fId && yId) valueMap.set(`${fId}_${yId}`, val);
     }
 
     // Map documents by field code
     const docMap = new Map<string, any[]>();
-    if (documents && Array.isArray(documents)) {
-      for (const doc of documents) {
-        const fCode = doc.fieldCode || doc.field?.code;
-        if (fCode) {
-          const list = docMap.get(fCode) || [];
-          list.push(doc);
-          docMap.set(fCode, list);
-        }
+    const docList = Array.isArray(documents)
+      ? documents
+      : documents && typeof documents === 'object'
+      ? Object.values(documents)
+      : [];
+
+    for (const doc of docList) {
+      if (!doc) continue;
+      const fCode = doc.fieldCode || doc.field?.code;
+      if (fCode) {
+        const list = docMap.get(fCode) || [];
+        list.push(doc);
+        docMap.set(fCode, list);
       }
     }
 
@@ -118,10 +137,10 @@ export class ExcelService {
     metaHeader.getCell(4).font = headerFont;
 
     const metaRows = [
-      ['Institution / Submitter Name', userName || 'Local User', ''],
-      ['Department', department || 'Department', ''],
+      ['Institution / Submitter Name', userName || 'Local User', 'Official Submitter'],
+      ['Department', department || 'Department', 'Academic Unit'],
       ['Admin Email', 'datacollection0709@gmail.com', 'Recipient'],
-      ['Total Attached Documents', documents.length.toString(), 'Drive Linked'],
+      ['Total Attached Documents', docList.length.toString(), 'Drive Linked'],
       ['Generated On', new Date().toLocaleString(), 'Institutional Export'],
     ];
 
@@ -185,35 +204,29 @@ export class ExcelService {
           if (!v) return '—';
           if (v.isNotApplicable) return 'N/A';
 
-          if (field.fieldType === 'CURRENCY') {
-            return v.numericValue !== null && v.numericValue !== undefined && !isNaN(v.numericValue)
-              ? `₹ ${Number(v.numericValue).toLocaleString('en-IN')}`
-              : (v.textValue || '—');
-          }
-          if (field.fieldType === 'PERCENTAGE') {
-            return v.numericValue !== null && v.numericValue !== undefined && !isNaN(v.numericValue)
-              ? `${Number(v.numericValue).toFixed(2)}%`
-              : (v.textValue || '—');
-          }
-          if (field.fieldType === 'RATIO') {
-            if (v.textValue) return v.textValue;
-            if (v.ratioNumerator && v.ratioDenominator) {
-              const r = Math.round(v.ratioNumerator / v.ratioDenominator);
-              return `1:${r} (${v.ratioNumerator})`;
+          if (v.numericValue !== null && v.numericValue !== undefined && !isNaN(Number(v.numericValue))) {
+            const num = Number(v.numericValue);
+            if (field.fieldType === 'CURRENCY') {
+              return `₹ ${num.toLocaleString('en-IN')}`;
             }
-            return v.numericValue !== null && v.numericValue !== undefined && !isNaN(v.numericValue)
-              ? `1:${v.numericValue}`
-              : '—';
+            if (field.fieldType === 'PERCENTAGE') {
+              return `${num.toFixed(2)}%`;
+            }
+            if (field.fieldType === 'RATIO') {
+              return v.textValue || `1:${num}`;
+            }
+            return num;
           }
-          if (field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL') {
-            return v.numericValue !== null && v.numericValue !== undefined && !isNaN(v.numericValue)
-              ? v.numericValue
-              : (v.textValue || '—');
-          }
+
           if (field.fieldType === 'BOOLEAN') {
             return v.textValue || (v.numericValue === 1 ? 'Yes' : v.numericValue === 0 ? 'No' : '—');
           }
-          return v.textValue || '—';
+
+          if (v.textValue !== null && v.textValue !== undefined && String(v.textValue).trim() !== '') {
+            return String(v.textValue);
+          }
+
+          return '—';
         };
 
         const val1 = formatValue(v1);
