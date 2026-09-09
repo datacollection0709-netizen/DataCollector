@@ -20,7 +20,7 @@
  */
 
 var ADMIN_EMAIL = "datacollection0709@gmail.com";
-var ROOT_FOLDER_NAME = "Attribute 3 Submitted Proofs";
+var TARGET_FOLDER_ID = "1nS-cyfFHwhqEIE-uwq0k0WUzTkUWaAQz";
 var SPREADSHEET_NAME = "Attribute 3 Form Submissions";
 
 function doPost(e) {
@@ -32,7 +32,8 @@ function doPost(e) {
       return jsonResponse({
         success: true,
         message: "Google Drive connection active for " + ADMIN_EMAIL,
-        email: ADMIN_EMAIL
+        email: ADMIN_EMAIL,
+        folderId: TARGET_FOLDER_ID
       });
     } else if (action === 'uploadFile') {
       return handleFileUpload(payload);
@@ -49,7 +50,8 @@ function doPost(e) {
 function doGet(e) {
   return jsonResponse({
     success: true,
-    message: "Attribute 3 API is running for " + ADMIN_EMAIL
+    message: "Attribute 3 API is running for " + ADMIN_EMAIL,
+    folderId: TARGET_FOLDER_ID
   });
 }
 
@@ -60,14 +62,19 @@ function handleFileUpload(payload) {
   var userName = payload.userName || 'Unknown User';
   var department = payload.department || 'Unknown Dept';
 
-  // Find or create root folder
-  var rootFolder = getOrCreateFolder(DriveApp.getRootFolder(), ROOT_FOLDER_NAME);
+  // Find target folder: Proofs (1nS-cyfFHwhqEIE-uwq0k0WUzTkUWaAQz)
+  var rootFolder;
+  try {
+    rootFolder = DriveApp.getFolderById(TARGET_FOLDER_ID);
+  } catch (e) {
+    rootFolder = getOrCreateFolder(DriveApp.getRootFolder(), "Attribute 3 Submitted Proofs");
+  }
   
   // Find or create department/user subfolder
   var subFolderName = department + " - " + userName;
   var userFolder = getOrCreateFolder(rootFolder, subFolderName);
 
-  // Decode file data and store
+  // Decode file data and store directly using datacollection0709@gmail.com's Drive quota
   var decoded = Utilities.base64Decode(base64Data);
   var blob = Utilities.newBlob(decoded, mimeType, fileName);
   var file = userFolder.createFile(blob);

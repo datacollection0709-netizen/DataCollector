@@ -9,7 +9,7 @@ export const GOOGLE_APPS_SCRIPT_CODE = `/**
  */
 
 var ADMIN_EMAIL = "datacollection0709@gmail.com";
-var ROOT_FOLDER_NAME = "Attribute 3 Submitted Proofs";
+var TARGET_FOLDER_ID = "1nS-cyfFHwhqEIE-uwq0k0WUzTkUWaAQz";
 var SPREADSHEET_NAME = "Attribute 3 Form Submissions";
 
 function doPost(e) {
