@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   UploadCloud,
   FileText,
@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Plus,
   FolderOpen,
+  Settings,
 } from 'lucide-react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
@@ -52,20 +53,45 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   documents,
   onDocumentChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'drive'>('upload');
+  const [activeTab, setActiveTab] = useState<'drive_upload' | 'drive_link'>('drive_upload');
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [hyperlinkInput, setHyperlinkInput] = useState('');
   const [hyperlinkLabel, setHyperlinkLabel] = useState('');
+  const [scriptUrlInput, setScriptUrlInput] = useState('');
+  const [showScriptConfig, setShowScriptConfig] = useState(false);
+  const [hasScriptUrl, setHasScriptUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const savedUrl = localStorage.getItem('GOOGLE_SCRIPT_URL') || (import.meta as any).env?.VITE_GOOGLE_SCRIPT_URL;
+    if (savedUrl) {
+      setHasScriptUrl(true);
+      setScriptUrlInput(savedUrl);
+    }
+  }, []);
+
+  const handleSaveScriptUrl = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scriptUrlInput.trim()) {
+      localStorage.removeItem('GOOGLE_SCRIPT_URL');
+      setHasScriptUrl(false);
+      setSuccessMsg('Google Apps Script URL cleared.');
+      return;
+    }
+    localStorage.setItem('GOOGLE_SCRIPT_URL', scriptUrlInput.trim());
+    setHasScriptUrl(true);
+    setShowScriptConfig(false);
+    setSuccessMsg('Google Apps Script URL saved! Direct uploads will go directly to datacollection0709@gmail.com Drive.');
+  };
 
   // Filter docs attached to this field
   const fieldDocs = documents.filter((d) => (d.fieldCode || (d as any).field?.code) === fieldCode);
   const isLimitReached = fieldDocs.length >= MAX_PROOFS_PER_FIELD;
 
-  // Direct File Upload Handler (Photos & PDFs up to 10 MB)
+  // Direct File Upload Handler (Official Google Drive upload via Apps Script)
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
@@ -113,19 +139,19 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       formData.append('dataUrl', dataUrl);
 
       await api.uploadDocument(formData);
-      setSuccessMsg(`"${file.name}" uploaded successfully! Link saved and ready for Excel.`);
+      setSuccessMsg(`"${file.name}" uploaded to Google Drive! Saved and ready for Excel.`);
       onDocumentChange();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to upload document.');
+      setErrorMsg(err.message || 'Failed to upload document to Google Drive.');
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Google Drive Link Handler
+  // Google Drive Link Handler (Official Google Drive link pasted)
   const handleAddHyperlink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hyperlinkInput.trim()) {
@@ -153,7 +179,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         finalUrl = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
       }
 
-      const linkTitle = hyperlinkLabel.trim() || (driveMatch ? 'Google Drive Proof Document' : 'Proof Document Link');
+      const linkTitle = hyperlinkLabel.trim() || (driveMatch ? 'Google Drive Document' : 'Proof Document Link');
 
       await api.addHyperlinkProof({
         submissionId,
@@ -163,7 +189,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         hyperlink: finalUrl,
       });
 
-      setSuccessMsg(`Google Drive proof "${linkTitle}" saved! It is clickable and openable in Excel.`);
+      setSuccessMsg(`Google Drive proof "${linkTitle}" saved! Direct link will appear in Excel.`);
       setHyperlinkInput('');
       setHyperlinkLabel('');
       onDocumentChange();
@@ -209,11 +235,19 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Upload Verification File / Proof"
-      description={`${fieldCode}: ${fieldLabel} — Maximum 3 proof files`}
+      title="Upload File to Google Drive"
+      description={`${fieldCode}: ${fieldLabel} — Official Google Drive Upload (No Third-Party Bots)`}
       maxWidth="lg"
     >
       <div className="space-y-4">
+        {/* Informational Guidance Alert */}
+        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs">
+          <CheckCircle2 className="w-4.5 h-4.5 text-blue-600 flex-shrink-0" />
+          <span>
+            <strong>Official Google Drive Storage:</strong> All documents and photos are stored on Google Drive (Admin: <code className="bg-blue-100 px-1 py-0.5 rounded font-mono text-[11px]">datacollection0709@gmail.com</code>). In Excel, the file link is placed directly in Column F with zero embedded images.
+          </span>
+        </div>
+
         {/* Alerts */}
         {errorMsg && (
           <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs">
@@ -248,25 +282,25 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           </span>
         </div>
 
-        {/* Method Tabs: Upload File (Default) & Paste Google Drive Link */}
+        {/* Method Selection Tabs */}
         <div className="flex border-b border-slate-200">
           <button
             type="button"
-            onClick={() => setActiveTab('upload')}
+            onClick={() => setActiveTab('drive_upload')}
             className={`flex items-center gap-1.5 py-2.5 px-4 text-xs font-semibold border-b-2 transition-all ${
-              activeTab === 'upload'
+              activeTab === 'drive_upload'
                 ? 'border-brand-600 text-brand-700'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
           >
-            <UploadCloud className="w-4 h-4" />
-            <span>Upload File (Photo / PDF)</span>
+            <FolderOpen className="w-4 h-4" />
+            <span>Upload via Official Google Drive</span>
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('drive')}
+            onClick={() => setActiveTab('drive_link')}
             className={`flex items-center gap-1.5 py-2.5 px-4 text-xs font-semibold border-b-2 transition-all ${
-              activeTab === 'drive'
+              activeTab === 'drive_link'
                 ? 'border-brand-600 text-brand-700'
                 : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}
@@ -277,101 +311,121 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         </div>
 
         {/* ==================================================== */}
-        {/* TAB 1: UPLOAD FILE OPTION (PRIMARY & DEFAULT) */}
+        {/* TAB 1: OFFICIAL GOOGLE DRIVE UPLOAD WORKFLOW */}
         {/* ==================================================== */}
-        {activeTab === 'upload' && (
-          <div>
-            {isLimitReached ? (
-              <div className="p-6 text-center rounded-xl bg-amber-50/60 border border-dashed border-amber-200 text-amber-800 text-xs">
-                <AlertCircle className="w-8 h-8 text-amber-600 mx-auto mb-2" />
-                <p className="font-semibold">Maximum 3 files already uploaded for this indicator.</p>
-                <p className="text-[11px] text-amber-700 mt-1">
-                  To upload a new file, please delete one of the existing files below.
-                </p>
+        {activeTab === 'drive_upload' && (
+          <div className="space-y-4">
+            {/* Step 1: Open Google Drive */}
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50/70 rounded-xl border border-blue-200 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <FolderOpen className="w-4 h-4 text-blue-600" />
+                    <span>Official Google Drive Upload</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                    1. Click <strong>Open Google Drive</strong> • 2. Upload file directly in Google Drive • 3. Click <strong>Share → Copy link</strong> • 4. Paste link below.
+                  </p>
+                </div>
+                <a
+                  href="https://drive.google.com/drive/my-drive"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow transition-all flex-shrink-0"
+                >
+                  <FolderOpen className="w-4 h-4" />
+                  <span>Open Google Drive</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
-            ) : (
+            </div>
+
+            {/* Direct In-App File Upload Option */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <UploadCloud className="w-4 h-4 text-brand-600" />
+                  <span>Or Upload Directly From Device</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowScriptConfig(!showScriptConfig)}
+                  className="text-[11px] text-brand-600 hover:underline flex items-center gap-1"
+                >
+                  <Settings className="w-3 h-3" />
+                  <span>{hasScriptUrl ? 'Drive API Connected' : 'Configure Drive Webhook'}</span>
+                </button>
+              </div>
+
+              {showScriptConfig && (
+                <form onSubmit={handleSaveScriptUrl} className="mb-3 p-3 bg-white rounded-lg border border-slate-200 space-y-2 text-xs">
+                  <p className="text-[11px] text-slate-600">
+                    To upload directly to <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">datacollection0709@gmail.com</code>'s Google Drive without opening a new tab, paste your official <strong>Google Apps Script Web App URL</strong> (from <code className="font-mono bg-slate-100 px-1 py-0.5 rounded">google_apps_script.js</code>):
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="https://script.google.com/macros/s/.../exec"
+                    value={scriptUrlInput}
+                    onChange={(e) => setScriptUrlInput(e.target.value)}
+                    className="w-full text-xs p-2 rounded border border-slate-300 font-mono outline-none focus:border-brand-500"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setShowScriptConfig(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" variant="primary" size="sm">
+                      Save Google Script URL
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept=".jpg,.jpeg,.png,.webp,.pdf"
+                onChange={(e) => handleFiles(e.target.files)}
+              />
+
               <div
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
-                className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-                  dragActive
-                    ? 'border-brand-500 bg-brand-50/50'
-                    : 'border-slate-300 hover:border-brand-400 bg-slate-50/50'
-                }`}
+                className="border-2 border-dashed border-slate-300 rounded-lg p-5 text-center bg-white"
               >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  accept=".jpg,.jpeg,.png,.webp,.pdf"
-                  onChange={(e) => handleFiles(e.target.files)}
-                />
-
                 <div className="flex flex-col items-center justify-center">
-                  <div className="w-14 h-14 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 mb-3 shadow-inner">
-                    {isUploading ? (
-                      <Loader2 className="w-7 h-7 animate-spin" />
-                    ) : (
-                      <UploadCloud className="w-7 h-7" />
-                    )}
-                  </div>
-
-                  <h3 className="text-sm font-bold text-slate-800 mb-1">
-                    {isUploading ? 'Uploading file...' : 'Upload Verification File'}
-                  </h3>
-
-                  <p className="text-xs text-slate-500 mb-4 max-w-sm">
-                    Drag and drop your photo or PDF here, or click the button below to browse from your device.
+                  <p className="text-xs text-slate-700 font-medium mb-2">
+                    {isUploading ? 'Uploading file directly to Google Drive...' : 'Drag and drop your photo or PDF here, or click to browse'}
                   </p>
 
                   <Button
                     type="button"
                     variant="primary"
-                    size="md"
-                    disabled={isUploading}
+                    size="sm"
+                    disabled={isUploading || isLimitReached}
                     onClick={() => fileInputRef.current?.click()}
-                    leftIcon={isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                    leftIcon={isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UploadCloud className="w-3.5 h-3.5" />}
                   >
-                    {isUploading ? 'Uploading...' : 'Choose File to Upload'}
+                    {isUploading ? 'Uploading to Drive...' : 'Choose File to Upload'}
                   </Button>
 
-                  <p className="text-[11px] text-slate-400 mt-3">
-                    JPG, PNG, WEBP, or PDF • <strong>Max 10 MB</strong> • Stored as clickable link in Excel
+                  <p className="text-[10px] text-slate-400 mt-2">
+                    Photos (JPG, PNG, WEBP) or PDF documents • Max 10 MB • 100% Google Drive
                   </p>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* ==================================================== */}
-        {/* TAB 2: PASTE GOOGLE DRIVE LINK OPTION */}
-        {/* ==================================================== */}
-        {activeTab === 'drive' && (
-          <div className="space-y-4">
-            <div className="p-3 bg-blue-50 rounded-xl border border-blue-200 flex items-center justify-between gap-3 text-xs">
-              <div>
-                <p className="font-semibold text-blue-900">Have a file already in Google Drive?</p>
-                <p className="text-[11px] text-blue-700 mt-0.5">Upload to Drive, copy the share link, and paste it below.</p>
-              </div>
-              <a
-                href="https://drive.google.com/drive/my-drive"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition-all flex-shrink-0"
-              >
-                <span>Open Google Drive</span>
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
             </div>
 
+            {/* Quick Link Input directly in Tab 1 */}
             <form onSubmit={handleAddHyperlink} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+              <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Link2 className="w-4 h-4 text-brand-600" />
+                <span>Paste Link from Google Drive</span>
+              </h4>
+
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Google Drive File Link *
-                </label>
                 <input
                   type="text"
                   required
@@ -382,43 +436,83 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Proof Title / Label (Optional)
-                </label>
+              <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="e.g. Geotagged Classroom Photo, DELNET Certificate"
+                  placeholder="Document Title (e.g. Classroom Photo, Invoice)"
                   value={hyperlinkLabel}
                   onChange={(e) => setHyperlinkLabel(e.target.value)}
-                  className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white"
+                  className="flex-1 text-xs p-2.5 rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white"
                 />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={isUploading || isLimitReached}
+                  leftIcon={<Plus className="w-3.5 h-3.5" />}
+                >
+                  Save Proof Link
+                </Button>
               </div>
-
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={isUploading || isLimitReached}
-                leftIcon={<Plus className="w-3.5 h-3.5" />}
-              >
-                Save Google Drive Proof
-              </Button>
             </form>
           </div>
         )}
 
         {/* ==================================================== */}
-        {/* ATTACHED PROOFS LIST WITH OPEN DRIVE BUTTONS */}
+        {/* TAB 2: PASTE GOOGLE DRIVE LINK */}
+        {/* ==================================================== */}
+        {activeTab === 'drive_link' && (
+          <form onSubmit={handleAddHyperlink} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Google Drive File Link *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="https://drive.google.com/file/d/..."
+                value={hyperlinkInput}
+                onChange={(e) => setHyperlinkInput(e.target.value)}
+                className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Document Title / Description (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Geotagged Classroom Photo, DELNET Subscription Receipt"
+                value={hyperlinkLabel}
+                onChange={(e) => setHyperlinkLabel(e.target.value)}
+                className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={isUploading || isLimitReached}
+              leftIcon={<Plus className="w-3.5 h-3.5" />}
+            >
+              Save Google Drive Proof
+            </Button>
+          </form>
+        )}
+
+        {/* ==================================================== */}
+        {/* ATTACHED GOOGLE DRIVE PROOFS LIST */}
         {/* ==================================================== */}
         <div>
           <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
-            Attached Files for {fieldCode} ({fieldDocs.length})
+            Attached Proofs for {fieldCode} ({fieldDocs.length})
           </h4>
 
           {fieldDocs.length === 0 ? (
             <div className="py-6 text-center text-xs text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
-              No files attached yet for this indicator. Click <strong>Choose File to Upload</strong> above.
+              No proofs attached yet for this indicator. Upload a file to Google Drive above.
             </div>
           ) : (
             <div className="space-y-2">
@@ -443,8 +537,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                         <p className="text-xs font-bold text-slate-800 truncate" title={doc.originalFileName}>
                           {doc.originalFileName}
                         </p>
-                        <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                          {doc.fileSize > 0 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : 'Cloud File'} • Attached {new Date(doc.uploadedAt || Date.now()).toLocaleDateString()}
+                        <p className="text-[11px] text-slate-400 truncate mt-0.5 font-mono">
+                          {targetUrl || 'Google Drive File'}
                         </p>
                       </div>
                     </div>
@@ -457,7 +551,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200 transition-colors"
                         >
-                          <span>Open File</span>
+                          <span>Open in Drive</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       )}

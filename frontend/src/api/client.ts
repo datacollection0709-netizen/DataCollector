@@ -618,19 +618,27 @@ class LocalApiClient {
       });
     }
 
-    // Upload to cloud (Google Drive if configured, or tmpfiles.org) to obtain an immediate public URL that Excel can open!
+    // Upload to official Google Drive via Google Apps Script (DriveApp.createFile) - NO THIRD-PARTY BOTS!
     let cloudUrl = '';
 
-    const googleScriptUrl = (import.meta as any).env?.VITE_GOOGLE_SCRIPT_URL;
+    const googleScriptUrl =
+      localStorage.getItem('GOOGLE_SCRIPT_URL') ||
+      (import.meta as any).env?.VITE_GOOGLE_SCRIPT_URL;
+
     if (googleScriptUrl) {
       try {
         const gRes = await fetch(googleScriptUrl, {
           method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8',
+          },
           body: JSON.stringify({
             action: 'uploadFile',
             fileName: file.name,
             mimeType: file.type,
             base64Data: dataUrl.includes('base64,') ? dataUrl.split('base64,')[1] : '',
+            userName: 'Institutional Officer',
+            department: 'Attribute 3',
           }),
         });
         const gJson = await gRes.json();
@@ -638,30 +646,12 @@ class LocalApiClient {
           cloudUrl = gJson.fileUrl;
         }
       } catch (e) {
-        console.warn('Google Script upload failed:', e);
+        console.warn('Official Google Drive upload failed:', e);
       }
     }
 
     if (!cloudUrl) {
-      try {
-        const upForm = new FormData();
-        upForm.append('file', file, file.name);
-        const tmpRes = await fetch('https://tmpfiles.org/api/v1/upload', {
-          method: 'POST',
-          body: upForm,
-        });
-        if (tmpRes.ok) {
-          const tmpJson = await tmpRes.json();
-          if (tmpJson?.data?.url) {
-            cloudUrl = tmpJson.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
-          }
-        }
-      } catch (e) {
-        console.warn('tmpfiles upload failed:', e);
-      }
-    }
-
-    if (!cloudUrl) {
+      // Official Google Drive search link for this uploaded document
       cloudUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(file.name)}`;
     }
 
