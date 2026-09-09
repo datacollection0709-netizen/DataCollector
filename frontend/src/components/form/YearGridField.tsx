@@ -1,5 +1,15 @@
 import React, { useState } from 'react';
-import { HelpCircle, Upload, CheckCircle2, AlertTriangle, MessageSquare, Ban, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  HelpCircle,
+  Upload,
+  CheckCircle2,
+  MessageSquare,
+  Ban,
+  ChevronUp,
+  FileText,
+  Paperclip,
+  Sparkles,
+} from 'lucide-react';
 import { DocumentUploadModal } from './DocumentUploadModal';
 
 interface YearGridFieldProps {
@@ -16,14 +26,17 @@ interface YearGridFieldProps {
     validationRules?: any;
   };
   years: { id: string; code: string }[];
-  values: Record<string, {
-    isNotApplicable?: boolean;
-    numericValue?: number | null;
-    textValue?: string | null;
-    ratioNumerator?: number | null;
-    ratioDenominator?: number | null;
-    remarks?: string | null;
-  }>;
+  values: Record<
+    string,
+    {
+      isNotApplicable?: boolean;
+      numericValue?: number | null;
+      textValue?: string | null;
+      ratioNumerator?: number | null;
+      ratioDenominator?: number | null;
+      remarks?: string | null;
+    }
+  >;
   onChange: (yearCode: string, fieldCode: string, updates: any) => void;
   submissionId: string;
   documents: any[];
@@ -43,111 +56,135 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
   const [showRemarks, setShowRemarks] = useState(false);
 
   // Documents attached to this field
-  const fieldDocs = documents.filter((d) => d.fieldCode === field.code);
+  const fieldDocs = documents.filter((d) => (d.fieldCode || d.field?.code) === field.code);
   const hasProof = fieldDocs.length > 0;
-  const isProofMissing = field.proofRequired && !hasProof;
 
   // Format currency display
   const formatCurrency = (val: number | null | undefined) => {
     if (val === null || val === undefined || isNaN(val)) return '';
-    return val.toLocaleString('en-IN');
+    return Number(val).toLocaleString('en-IN');
   };
 
-  const varianceWarning = null;
+  // Check if all years are filled or N/A
+  const isAllNA = years.every((y) => values[y.code]?.isNotApplicable);
+  const isFullyAnswered = years.every((y) => {
+    const v = values[y.code];
+    if (!v) return false;
+    if (v.isNotApplicable) return true;
+    if (field.fieldType === 'BOOLEAN') return v.textValue === 'Yes' || v.textValue === 'No';
+    if (field.fieldType === 'RATIO') return !!(v.ratioNumerator && v.ratioDenominator);
+    if (field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL' || field.fieldType === 'CURRENCY' || field.fieldType === 'PERCENTAGE') {
+      return v.numericValue !== null && v.numericValue !== undefined && !isNaN(v.numericValue);
+    }
+    return !!(v.textValue && v.textValue.trim() !== '');
+  });
 
-  // Helper to toggle Not Applicable for all years
+  // Toggle all years to N/A or restore
   const toggleAllNA = () => {
-    const isCurrentlyNA = years.every((y) => values[y.code]?.isNotApplicable);
-    const newNA = !isCurrentlyNA;
+    const nextNA = !isAllNA;
     years.forEach((y) => {
       onChange(y.code, field.code, {
-        isNotApplicable: newNA,
-        textValue: newNA ? 'N/A' : null,
-        numericValue: newNA ? null : null,
+        isNotApplicable: nextNA,
+        textValue: nextNA ? 'N/A' : null,
+        numericValue: null,
       });
     });
   };
 
-  const isAllNA = years.every((y) => values[y.code]?.isNotApplicable);
-
   return (
-    <div className="bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-all p-4 shadow-sm">
-      {/* Header & Meta */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
-        <div className="flex items-start gap-2.5">
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold font-mono bg-slate-100 text-slate-700 border border-slate-200">
+    <div
+      className={`rounded-2xl border transition-all duration-200 p-5 sm:p-6 bg-white shadow-sm hover:shadow-md ${
+        isFullyAnswered
+          ? 'border-emerald-200/80 bg-gradient-to-b from-emerald-50/20 to-white'
+          : isAllNA
+          ? 'border-amber-200/70 bg-amber-50/10'
+          : 'border-slate-200/80 hover:border-brand-300'
+      }`}
+    >
+      {/* Top Row: Code Badge, Title, Unit, and Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-brand-50 text-brand-700 border border-brand-200/60 flex-shrink-0">
             {field.code}
           </span>
 
           <div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold text-slate-800">{field.label}</span>
-              {field.required && <span className="text-rose-500 font-bold">*</span>}
-              {field.description && (
-                <div className="relative group inline-block">
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-400 hover:text-slate-600 cursor-help" />
-                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block z-20 w-64 p-2 bg-slate-900 text-white text-[11px] rounded shadow-lg">
-                    {field.description}
-                  </div>
-                </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm sm:text-base font-semibold text-slate-800 tracking-tight">
+                {field.label}
+              </h3>
+              {field.unit && (
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  {field.unit}
+                </span>
+              )}
+              {isFullyAnswered && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Answered
+                </span>
               )}
             </div>
 
-            {field.unit && (
-              <span className="text-[11px] text-slate-400">Unit: {field.unit}</span>
+            {field.description && (
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                {field.description}
+              </p>
             )}
           </div>
         </div>
 
-        {/* Action Pills: Proofs & Remarks & NA Toggle */}
-        <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0">
-          {/* Not Applicable button */}
+        {/* Action Controls: N/A, Proofs, Remarks */}
+        <div className="flex items-center gap-2 self-end sm:self-auto flex-shrink-0">
+          {/* N/A Toggle Button */}
           <button
             type="button"
             onClick={toggleAllNA}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
               isAllNA
-                ? 'bg-amber-100 text-amber-800 border-amber-300'
-                : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
+                ? 'bg-amber-100 text-amber-800 border border-amber-300 shadow-sm'
+                : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600 border border-slate-200'
             }`}
-            title="Mark facility as Not Applicable (e.g. Non-residential / No hostel)"
+            title="Mark this facility as Not Applicable"
           >
-            <Ban className="w-3 h-3" />
-            {isAllNA ? 'Marked N/A' : 'Set N/A'}
+            <Ban className="w-3.5 h-3.5" />
+            <span>{isAllNA ? 'Marked N/A' : 'Set N/A'}</span>
           </button>
 
-          {/* Proof upload button */}
+          {/* Document Proof Button */}
           <button
             type="button"
             onClick={() => setShowUploadModal(true)}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium border transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
               hasProof
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                : isProofMissing
-                ? 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100 animate-pulse'
-                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 shadow-sm'
+                : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
             }`}
           >
             {hasProof ? (
               <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{fieldDocs.length} Proof{fieldDocs.length > 1 ? 's' : ''}</span>
+                <Paperclip className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{fieldDocs.length} Proof{fieldDocs.length > 1 ? 's' : ''} Attached</span>
               </>
             ) : (
               <>
-                <Upload className="w-3.5 h-3.5" />
-                <span>{field.proofRequired ? 'Proof Required' : 'Add Proof'}</span>
+                <Upload className="w-3.5 h-3.5 text-slate-500" />
+                <span>Add Proof (Drive)</span>
               </>
             )}
           </button>
 
-          {/* Remarks toggle */}
+          {/* Remarks Toggle */}
           {field.remarksAllowed && (
             <button
               type="button"
               onClick={() => setShowRemarks(!showRemarks)}
-              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
-              title="Add or view remarks"
+              className={`p-1.5 rounded-xl border transition-all ${
+                showRemarks || years.some((y) => values[y.code]?.remarks)
+                  ? 'bg-brand-50 text-brand-600 border-brand-200'
+                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 border-transparent'
+              }`}
+              title="Add Contextual Notes / Remarks"
             >
               <MessageSquare className="w-4 h-4" />
             </button>
@@ -155,209 +192,218 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
         </div>
       </div>
 
+      {/* Year-Wise Modern Inputs Grid */}
+      {isAllNA ? (
+        <div className="py-4 px-4 rounded-xl bg-amber-50/50 border border-dashed border-amber-200 text-center text-amber-800 text-xs font-medium flex items-center justify-center gap-2">
+          <Ban className="w-4 h-4 text-amber-600" />
+          <span>This indicator is currently marked as <strong>Not Applicable</strong> for your institution. Click "Marked N/A" above to re-enable data entry.</span>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+          {years.map((year) => {
+            const val = values[year.code] || {};
+            const isYearNA = val.isNotApplicable ?? false;
 
-      {/* Year-Wise Grid Inputs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {years.map((year) => {
-          const val = values[year.code] || {};
-          const isNA = val.isNotApplicable ?? false;
-
-          return (
-            <div
-              key={year.code}
-              className={`p-2.5 rounded-md border ${
-                isNA ? 'bg-slate-100 border-slate-200 opacity-65' : 'bg-slate-50/50 border-slate-200'
-              }`}
-            >
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-bold text-slate-800 font-mono">{year.code}</span>
-                <label className="flex items-center gap-1.5 cursor-pointer hover:bg-slate-200/50 px-1.5 py-0.5 rounded transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={isNA}
-                    onChange={(e) => {
-                      const newNA = e.target.checked;
-                      onChange(year.code, field.code, {
-                        isNotApplicable: newNA,
-                        textValue: newNA ? '-----' : null,
-                        numericValue: newNA ? null : null,
-                      });
-                    }}
-                    className="w-3.5 h-3.5 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer"
-                  />
-                  <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider">N/A</span>
-                </label>
-              </div>
-
-              {/* Render appropriate input */}
-              {isNA ? (
-                <div className="py-2 text-center text-xs font-mono text-slate-400 font-bold tracking-widest bg-slate-50 rounded border border-dashed border-slate-300">
-                  N/A
+            return (
+              <div
+                key={year.code}
+                className={`p-3.5 rounded-xl border transition-all ${
+                  isYearNA
+                    ? 'bg-slate-50 border-slate-200 opacity-60'
+                    : 'bg-slate-50/60 hover:bg-white focus-within:bg-white border-slate-200 hover:border-slate-300 focus-within:border-brand-500 focus-within:ring-4 focus-within:ring-brand-500/10'
+                }`}
+              >
+                {/* Year Card Header */}
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs font-bold tracking-wide text-slate-700 font-mono">
+                    {year.code}
+                  </span>
+                  <label className="flex items-center gap-1 cursor-pointer hover:bg-slate-200/50 px-1.5 py-0.5 rounded transition-colors text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                    <input
+                      type="checkbox"
+                      checked={isYearNA}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        onChange(year.code, field.code, {
+                          isNotApplicable: next,
+                          textValue: next ? 'N/A' : null,
+                          numericValue: null,
+                        });
+                      }}
+                      className="w-3 h-3 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer"
+                    />
+                    <span>N/A</span>
+                  </label>
                 </div>
-              ) : field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL' ? (
-                <div className="flex items-center bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
-                  {field.unit && (
-                    <div className="pl-3 pr-2 py-1.5 bg-slate-50 border-r border-slate-200 text-xs text-slate-500 font-medium select-none whitespace-nowrap">
-                      {field.unit.split(' ')[0]}
-                    </div>
-                  )}
-                  <input
-                    type="number"
-                    step={field.fieldType === 'DECIMAL' ? '0.01' : '1'}
-                    min="0"
-                    placeholder="Enter value"
-                    value={val.numericValue !== null && val.numericValue !== undefined ? val.numericValue : ''}
-                    onChange={(e) => {
-                      const num = e.target.value === '' ? null : parseFloat(e.target.value);
-                      onChange(year.code, field.code, {
-                        numericValue: num,
-                        textValue: e.target.value,
-                        isNotApplicable: false,
-                      });
-                    }}
-                    className="w-full bg-transparent border-0 py-1.5 px-3 text-right font-mono text-base focus:ring-0 outline-none placeholder:text-slate-300 placeholder:text-sm placeholder:font-sans"
-                  />
-                </div>
-              ) : field.fieldType === 'CURRENCY' ? (
-                <div className="flex items-center bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
-                  <div className="pl-3 pr-2 py-1.5 bg-slate-50 border-r border-slate-200 text-sm text-slate-500 font-medium select-none whitespace-nowrap">
-                    ₹
+
+                {/* Input Renderers */}
+                {isYearNA ? (
+                  <div className="py-2.5 text-center text-xs font-mono text-slate-400 font-semibold bg-white rounded-lg border border-dashed border-slate-200">
+                    N/A
                   </div>
+                ) : field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL' ? (
+                  <div className="relative flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden focus-within:border-brand-500">
+                    <input
+                      type="number"
+                      step={field.fieldType === 'DECIMAL' ? '0.01' : '1'}
+                      min="0"
+                      placeholder="0"
+                      value={val.numericValue !== null && val.numericValue !== undefined ? val.numericValue : ''}
+                      onChange={(e) => {
+                        const num = e.target.value === '' ? null : parseFloat(e.target.value);
+                        onChange(year.code, field.code, {
+                          numericValue: num,
+                          textValue: e.target.value,
+                          isNotApplicable: false,
+                        });
+                      }}
+                      className="w-full bg-transparent border-0 py-2 px-3 text-right font-mono text-sm sm:text-base font-semibold text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-normal"
+                    />
+                    {field.unit && (
+                      <div className="pr-3 pl-1 text-xs text-slate-400 select-none whitespace-nowrap">
+                        {field.unit.split(' ')[0]}
+                      </div>
+                    )}
+                  </div>
+                ) : field.fieldType === 'CURRENCY' ? (
+                  <div className="relative flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden focus-within:border-brand-500">
+                    <div className="pl-3 pr-1 text-sm font-semibold text-slate-400 select-none">
+                      ₹
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="0"
+                      value={formatCurrency(val.numericValue)}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/[^0-9]/g, '');
+                        const num = clean === '' ? null : parseInt(clean, 10);
+                        onChange(year.code, field.code, {
+                          numericValue: num,
+                          textValue: clean ? `₹ ${parseInt(clean, 10).toLocaleString('en-IN')}` : null,
+                          isNotApplicable: false,
+                        });
+                      }}
+                      className="w-full bg-transparent border-0 py-2 px-3 text-right font-mono text-sm sm:text-base font-semibold text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-normal"
+                    />
+                  </div>
+                ) : field.fieldType === 'PERCENTAGE' ? (
+                  <div className="relative flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden focus-within:border-brand-500">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      placeholder="0.00"
+                      value={val.numericValue !== null && val.numericValue !== undefined ? val.numericValue : ''}
+                      onChange={(e) => {
+                        const num = e.target.value === '' ? null : parseFloat(e.target.value);
+                        onChange(year.code, field.code, {
+                          numericValue: num,
+                          textValue: num !== null ? `${num.toFixed(2)}%` : null,
+                          isNotApplicable: false,
+                        });
+                      }}
+                      className="w-full bg-transparent border-0 py-2 px-3 text-right font-mono text-sm sm:text-base font-semibold text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-normal"
+                    />
+                    <div className="pr-3 pl-1 text-xs font-bold text-slate-400 select-none">
+                      %
+                    </div>
+                  </div>
+                ) : field.fieldType === 'RATIO' ? (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-white border border-slate-200 rounded-lg p-1.5 focus-within:border-brand-500">
+                        <span className="block text-[10px] text-slate-400 uppercase font-semibold text-center">Students</span>
+                        <input
+                          type="number"
+                          placeholder="Students"
+                          value={val.ratioNumerator ?? ''}
+                          onChange={(e) => {
+                            const n = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                            const denom = val.ratioDenominator;
+                            let text = null;
+                            if (n && denom) {
+                              text = `1:${Math.round(n / denom)} (${n})`;
+                            }
+                            onChange(year.code, field.code, {
+                              ratioNumerator: n,
+                              textValue: text || val.textValue,
+                              numericValue: n && denom ? Math.round(n / denom) : null,
+                            });
+                          }}
+                          className="w-full text-center font-mono text-xs sm:text-sm font-semibold text-slate-900 border-0 p-0 focus:ring-0 outline-none"
+                        />
+                      </div>
+                      <div className="bg-white border border-slate-200 rounded-lg p-1.5 focus-within:border-brand-500">
+                        <span className="block text-[10px] text-slate-400 uppercase font-semibold text-center">Computers</span>
+                        <input
+                          type="number"
+                          placeholder="Computers"
+                          value={val.ratioDenominator ?? ''}
+                          onChange={(e) => {
+                            const d = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                            const num = val.ratioNumerator;
+                            let text = null;
+                            if (num && d) {
+                              text = `1:${Math.round(num / d)} (${num})`;
+                            }
+                            onChange(year.code, field.code, {
+                              ratioDenominator: d,
+                              textValue: text || val.textValue,
+                              numericValue: num && d ? Math.round(num / d) : null,
+                            });
+                          }}
+                          className="w-full text-center font-mono text-xs sm:text-sm font-semibold text-slate-900 border-0 p-0 focus:ring-0 outline-none"
+                        />
+                      </div>
+                    </div>
+                    {val.textValue && (
+                      <div className="text-[11px] font-mono text-center font-semibold text-brand-700 bg-brand-50/80 py-1 rounded-md border border-brand-200/50">
+                        Ratio: {val.textValue}
+                      </div>
+                    )}
+                  </div>
+                ) : field.fieldType === 'BOOLEAN' ? (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange(year.code, field.code, {
+                          textValue: 'Yes',
+                          numericValue: 1,
+                          isNotApplicable: false,
+                        })
+                      }
+                      className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
+                        val.textValue === 'Yes'
+                          ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-600/30'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      Yes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange(year.code, field.code, {
+                          textValue: 'No',
+                          numericValue: 0,
+                          isNotApplicable: false,
+                        })
+                      }
+                      className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${
+                        val.textValue === 'No'
+                          ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-600/30'
+                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      No
+                    </button>
+                  </div>
+                ) : (
                   <input
                     type="text"
-                    placeholder="0"
-                    value={formatCurrency(val.numericValue)}
-                    onChange={(e) => {
-                      const clean = e.target.value.replace(/[^0-9]/g, '');
-                      const num = clean === '' ? null : parseInt(clean, 10);
-                      onChange(year.code, field.code, {
-                        numericValue: num,
-                        textValue: clean ? `₹ ${parseInt(clean, 10).toLocaleString('en-IN')}` : null,
-                        isNotApplicable: false,
-                      });
-                    }}
-                    className="w-full bg-transparent border-0 py-1.5 px-3 text-right font-mono text-base font-medium text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-sans placeholder:font-normal"
-                  />
-                </div>
-              ) : field.fieldType === 'PERCENTAGE' ? (
-                <div className="flex items-center bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    placeholder="0.00"
-                    value={val.numericValue !== null && val.numericValue !== undefined ? val.numericValue : ''}
-                    onChange={(e) => {
-                      const num = e.target.value === '' ? null : parseFloat(e.target.value);
-                      onChange(year.code, field.code, {
-                        numericValue: num,
-                        textValue: num !== null ? `${num.toFixed(2)}%` : null,
-                        isNotApplicable: false,
-                      });
-                    }}
-                    className="w-full bg-transparent border-0 py-1.5 px-3 text-right font-mono text-base text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-sans placeholder:text-sm"
-                  />
-                  <div className="pr-3 pl-2 py-1.5 bg-slate-50 border-l border-slate-200 text-sm text-slate-500 font-bold select-none whitespace-nowrap">
-                    %
-                  </div>
-                </div>
-              ) : field.fieldType === 'RATIO' ? (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
-                      <label className="block text-[10px] text-center bg-slate-50 border-b border-slate-100 py-1 text-slate-500 font-semibold uppercase tracking-wider">Students</label>
-                      <input
-                        type="number"
-                        placeholder="Enrolled"
-                        value={val.ratioNumerator ?? ''}
-                        onChange={(e) => {
-                          const n = e.target.value === '' ? null : parseInt(e.target.value, 10);
-                          const denom = val.ratioDenominator;
-                          let text = null;
-                          if (n && denom) {
-                            text = `1:${Math.round(n / denom)} (${n})`;
-                          }
-                          onChange(year.code, field.code, {
-                            ratioNumerator: n,
-                            textValue: text || val.textValue,
-                            numericValue: n && denom ? Math.round(n / denom) : null,
-                          });
-                        }}
-                        className="w-full bg-transparent border-0 py-1.5 px-2 text-center text-sm font-mono focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-sans"
-                      />
-                    </div>
-                    <div className="bg-white border border-slate-200 rounded focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 transition-all overflow-hidden">
-                      <label className="block text-[10px] text-center bg-slate-50 border-b border-slate-100 py-1 text-slate-500 font-semibold uppercase tracking-wider">Computers</label>
-                      <input
-                        type="number"
-                        placeholder="Available"
-                        value={val.ratioDenominator ?? ''}
-                        onChange={(e) => {
-                          const d = e.target.value === '' ? null : parseInt(e.target.value, 10);
-                          const num = val.ratioNumerator;
-                          let text = null;
-                          if (num && d) {
-                            text = `1:${Math.round(num / d)} (${num})`;
-                          }
-                          onChange(year.code, field.code, {
-                            ratioDenominator: d,
-                            textValue: text || val.textValue,
-                            numericValue: num && d ? Math.round(num / d) : null,
-                          });
-                        }}
-                        className="w-full bg-transparent border-0 py-1.5 px-2 text-center text-sm font-mono focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-sans"
-                      />
-                    </div>
-                  </div>
-                  {val.textValue && (
-                    <div className="text-[11px] font-mono text-center font-semibold text-brand-700 bg-brand-50 py-1 rounded border border-brand-200">
-                      Ratio: {val.textValue}
-                    </div>
-                  )}
-                </div>
-              ) : field.fieldType === 'BOOLEAN' ? (
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChange(year.code, field.code, {
-                        textValue: 'Yes',
-                        numericValue: 1,
-                        isNotApplicable: false,
-                      })
-                    }
-                    className={`flex-1 py-1.5 text-xs font-medium rounded border transition-colors ${
-                      val.textValue === 'Yes'
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    Yes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChange(year.code, field.code, {
-                        textValue: 'No',
-                        numericValue: 0,
-                        isNotApplicable: false,
-                      })
-                    }
-                    className={`flex-1 py-1.5 text-xs font-medium rounded border transition-colors ${
-                      val.textValue === 'No'
-                        ? 'bg-rose-600 text-white border-rose-600 shadow-sm'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    No
-                  </button>
-                </div>
-              ) : field.fieldType === 'MULTI_SELECT' ? (
-                <div className="space-y-1">
-                  <input
-                    type="text"
-                    placeholder="Enter facilities..."
+                    placeholder="Enter details..."
                     value={val.textValue || ''}
                     onChange={(e) =>
                       onChange(year.code, field.code, {
@@ -365,69 +411,34 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                         isNotApplicable: false,
                       })
                     }
-                    className="table-cell-input text-sm"
+                    className="w-full bg-white border border-slate-200 rounded-lg py-2 px-3 text-xs sm:text-sm text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
                   />
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {['Virtual Labs', 'AR/VR', 'Media Center'].map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => {
-                          const current = val.textValue ? val.textValue.split(', ') : [];
-                          const updated = current.includes(tag)
-                            ? current.filter((t: string) => t !== tag)
-                            : [...current, tag];
-                          onChange(year.code, field.code, {
-                            textValue: updated.join(', '),
-                            isNotApplicable: false,
-                          });
-                        }}
-                        className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                          (val.textValue || '').includes(tag)
-                            ? 'bg-brand-600 text-white border-brand-600'
-                            : 'bg-white text-slate-600 border-slate-200'
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <input
-                  type="text"
-                  placeholder="Enter details..."
-                  value={val.textValue || ''}
-                  onChange={(e) =>
-                    onChange(year.code, field.code, {
-                      textValue: e.target.value,
-                      isNotApplicable: false,
-                    })
-                  }
-                  className="table-cell-input text-xs"
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Remarks / Explanatory Notes Drawer */}
+      {/* Remarks Drawer */}
       {showRemarks && field.remarksAllowed && (
-        <div className="mt-3 pt-3 border-t border-slate-100 space-y-2">
+        <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
           <div className="flex items-center justify-between text-xs text-slate-600">
-            <span className="font-medium">Remarks / Contextual Notes</span>
+            <span className="font-semibold flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5 text-brand-600" />
+              Optional Auditor Notes & Explanations
+            </span>
             <button
               type="button"
               onClick={() => setShowRemarks(false)}
               className="text-slate-400 hover:text-slate-600"
             >
-              <ChevronUp className="w-3.5 h-3.5" />
+              <ChevronUp className="w-4 h-4" />
             </button>
           </div>
           <textarea
             rows={2}
-            placeholder="Add any specific context, operational notes, or explanations for the reviewer..."
+            placeholder="Add context or notes for the reviewer / admin (datacollection0709@gmail.com)..."
             value={years.map((y) => values[y.code]?.remarks).filter(Boolean)[0] || ''}
             onChange={(e) => {
               const text = e.target.value;
@@ -435,12 +446,12 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                 onChange(y.code, field.code, { remarks: text });
               });
             }}
-            className="w-full text-xs p-2 rounded border border-slate-200 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none"
+            className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/10 outline-none placeholder:text-slate-400"
           />
         </div>
       )}
 
-      {/* Proof upload modal */}
+      {/* Proof Upload Modal */}
       <DocumentUploadModal
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}

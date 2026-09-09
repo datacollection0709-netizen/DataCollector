@@ -12,6 +12,7 @@ import {
   FileText,
   AlertCircle,
   Download,
+  Mail,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -72,7 +73,6 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
   }
 
   const overall = progress?.overallPercentage ?? 0;
-  const isReadyToSubmit = overall === 100 && (progress?.missingRequiredProofs?.length ?? 0) === 0;
 
   const handleFinalSubmit = async () => {
     setIsSubmitting(true);
@@ -92,16 +92,20 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 rounded text-xs font-bold font-mono bg-brand-50 text-brand-700 border border-brand-200">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold font-mono bg-brand-50 text-brand-700 border border-brand-200/60">
                 FINAL AUDIT & REVIEW
               </span>
               <StatusBadge status={submission?.status || 'DRAFT'} />
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                <Mail className="w-3 h-3 text-slate-400" />
+                Admin: datacollection0709@gmail.com
+              </span>
             </div>
-            <h1 className="text-xl font-bold text-slate-900">
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               Attribute 3: Comprehensive Review
             </h1>
             <p className="text-xs text-slate-500 mt-1">
@@ -121,35 +125,45 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
           </div>
         </div>
 
-        {/* Missing Proofs Alert */}
+        {/* Missing Proofs Alert (Informational) */}
         {progress?.missingRequiredProofs?.length > 0 && (
-          <div className="mt-4 p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+          <div className="mt-4 p-4 bg-amber-50/80 border border-amber-200 rounded-xl text-amber-900 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <div className="font-bold text-xs uppercase tracking-wider">
-                {progress.missingRequiredProofs.length} Mandatory Supporting Proof(s) Missing:
+              <div className="font-bold text-xs uppercase tracking-wider text-amber-800">
+                {progress.missingRequiredProofs.length} Optional Proof Document(s) Not Yet Attached:
               </div>
-              <ul className="text-xs list-disc list-inside mt-1 space-y-0.5 text-rose-800">
-                {progress.missingRequiredProofs.map((p: any) => (
+              <ul className="text-xs list-disc list-inside mt-1 space-y-0.5 text-amber-800/90">
+                {progress.missingRequiredProofs.slice(0, 5).map((p: any) => (
                   <li key={p.fieldCode}>
                     <span className="font-semibold font-mono">{p.fieldCode}</span>: {p.label}
                   </li>
                 ))}
+                {progress.missingRequiredProofs.length > 5 && (
+                  <li className="list-none text-slate-500 italic mt-0.5">
+                    + {progress.missingRequiredProofs.length - 5} more indicators
+                  </li>
+                )}
               </ul>
             </div>
           </div>
         )}
 
         {/* Submit Actions */}
-        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3 flex-wrap">
           {submitError && (
-            <span className="text-rose-600 text-sm font-medium mr-auto">{submitError}</span>
+            <span className="text-rose-600 text-xs font-semibold mr-auto bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200">
+              {submitError}
+            </span>
           )}
           {submitSuccess && (
-            <span className="text-emerald-600 text-sm font-medium mr-auto">Successfully submitted to Google Sheets!</span>
+            <span className="text-emerald-700 text-xs font-semibold mr-auto bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Submission recorded & sent to datacollection0709@gmail.com!
+            </span>
           )}
           <Button
-            onClick={handleFinalSubmit}
+            onClick={() => setShowConfirmModal(true)}
             isLoading={isSubmitting}
             leftIcon={<Send className="w-4 h-4" />}
           >
@@ -157,6 +171,34 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold">
+                <Send className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Confirm Submission</h3>
+                <p className="text-xs text-slate-500">Submit to datacollection0709@gmail.com</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Your response will be recorded into the institutional Google Sheet and proof documents will be permanently organized in Google Drive. An automated notification email will be dispatched to <strong>datacollection0709@gmail.com</strong>.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button variant="outline" size="sm" onClick={() => setShowConfirmModal(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleFinalSubmit} isLoading={isSubmitting}>
+                Confirm & Submit
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Sections Review Accordions */}
       <div className="space-y-4">
@@ -166,14 +208,14 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
           const isComplete = (secProg?.percentage ?? 0) === 100;
 
           return (
-            <div key={sec.code} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div key={sec.code} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
               {/* Accordion Header */}
               <div
                 onClick={() => toggleCollapse(sec.code)}
-                className="flex items-center justify-between p-4 bg-slate-50/70 hover:bg-slate-100/70 cursor-pointer transition-colors border-b border-slate-100"
+                className="flex items-center justify-between p-4 sm:p-5 bg-slate-50/50 hover:bg-slate-100/60 cursor-pointer transition-colors border-b border-slate-100"
               >
                 <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-lg bg-brand-100 text-brand-700 font-mono font-bold text-xs flex items-center justify-center">
+                  <span className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 font-mono font-bold text-xs flex items-center justify-center border border-brand-200/50">
                     {sec.code}
                   </span>
                   <div>
@@ -199,7 +241,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                       e.stopPropagation();
                       onNavigateSection(sec.code);
                     }}
-                    className="text-xs font-medium text-brand-600 hover:text-brand-800 px-2 py-1 hover:bg-brand-50 rounded"
+                    className="text-xs font-semibold text-brand-600 hover:text-brand-800 px-2.5 py-1 hover:bg-brand-50 rounded-lg transition-colors"
                   >
                     Edit
                   </button>
@@ -235,26 +277,50 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
 
                         const renderCell = (v: any) => {
                           if (!v) return <span className="text-slate-300">—</span>;
-                          if (v.isNotApplicable) return <span className="font-mono text-slate-400">-----</span>;
+                          if (v.isNotApplicable) {
+                            return (
+                              <span className="font-mono font-semibold text-[11px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60">
+                                N/A
+                              </span>
+                            );
+                          }
 
                           if (field.fieldType === 'CURRENCY') {
                             return (
                               <span className="font-mono font-medium">
-                                {v.numericValue !== null ? `₹ ${v.numericValue.toLocaleString('en-IN')}` : '—'}
+                                {v.numericValue !== null && v.numericValue !== undefined
+                                  ? `₹ ${Number(v.numericValue).toLocaleString('en-IN')}`
+                                  : '—'}
                               </span>
                             );
                           }
                           if (field.fieldType === 'PERCENTAGE') {
                             return (
                               <span className="font-mono font-medium">
-                                {v.numericValue !== null ? `${v.numericValue.toFixed(2)}%` : '—'}
+                                {v.numericValue !== null && v.numericValue !== undefined
+                                  ? `${Number(v.numericValue).toFixed(2)}%`
+                                  : '—'}
                               </span>
                             );
                           }
                           if (field.fieldType === 'RATIO') {
                             return <span className="font-mono font-medium">{v.textValue || '—'}</span>;
                           }
-                          if (field.fieldType === 'NUMBER') {
+                          if (field.fieldType === 'BOOLEAN') {
+                            const isYes = v.textValue === 'Yes' || v.numericValue === 1;
+                            return (
+                              <span
+                                className={`font-semibold text-xs px-2 py-0.5 rounded ${
+                                  isYes
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                }`}
+                              >
+                                {isYes ? 'Yes' : 'No'}
+                              </span>
+                            );
+                          }
+                          if (field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL') {
                             return <span className="font-mono">{v.numericValue ?? '—'}</span>;
                           }
                           return <span>{v.textValue || '—'}</span>;
@@ -278,18 +344,20 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                                   {docs.map((d: any) => (
                                     <div key={d.id} className="flex items-center gap-1.5 text-brand-600">
                                       <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                                      <span className="truncate max-w-[200px]" title={d.originalFileName}>
+                                      <a
+                                        href={d.fileUrl && d.fileUrl !== '#' ? d.fileUrl : undefined}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="truncate max-w-[200px] hover:underline"
+                                        title={d.originalFileName}
+                                      >
                                         {d.originalFileName}
-                                      </span>
+                                      </a>
                                     </div>
                                   ))}
                                 </div>
-                              ) : field.proofRequired ? (
-                                <span className="text-[11px] text-rose-600 font-semibold flex items-center gap-1">
-                                  <AlertCircle className="w-3 h-3" /> Mandatory proof missing
-                                </span>
                               ) : (
-                                <span className="text-slate-400 italic">Optional proof</span>
+                                <span className="text-slate-400 italic">No proof attached</span>
                               )}
                             </td>
                           </tr>
@@ -303,8 +371,6 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
           );
         })}
       </div>
-
-
     </div>
   );
 };

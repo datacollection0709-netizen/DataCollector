@@ -6,7 +6,12 @@ export class ExcelService {
   /**
    * Generates a fully-formatted institutional workbook resembling the original sheet
    */
-  static async generateAndDownloadAttribute3Workbook(submissionData: any, userName: string, department: string) {
+  static async generateAndDownloadAttribute3Workbook(
+    submissionData: any,
+    userName: string,
+    department: string,
+    documents: any[] = []
+  ) {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Attribute 3 Institutional System';
     workbook.lastModifiedBy = userName || 'System';
@@ -16,11 +21,33 @@ export class ExcelService {
     const sections = attribute3Schema.attribute.sections;
     const years = attribute3Schema.years;
 
-    // Map values
+    // Map values: index by all possible keys to ensure we NEVER miss an entry
     const valueMap = new Map<string, any>();
     if (submissionData && Array.isArray(submissionData)) {
       for (const val of submissionData) {
-        valueMap.set(`${val.fieldId}_${val.yearId}`, val);
+        if (!val) continue;
+        const fCode = val.fieldCode || val.field?.code;
+        const yCode = val.yearCode || val.year?.code;
+        const fId = val.fieldId || val.field?.id;
+        const yId = val.yearId || val.year?.id;
+
+        if (fCode && yCode) valueMap.set(`${fCode}_${yCode}`, val);
+        if (fId && yId) valueMap.set(`${fId}_${yId}`, val);
+        if (fCode && yId) valueMap.set(`${fCode}_${yId}`, val);
+        if (fId && yCode) valueMap.set(`${fId}_${yCode}`, val);
+      }
+    }
+
+    // Map documents by field code
+    const docMap = new Map<string, any[]>();
+    if (documents && Array.isArray(documents)) {
+      for (const doc of documents) {
+        const fCode = doc.fieldCode || doc.field?.code;
+        if (fCode) {
+          const list = docMap.get(fCode) || [];
+          list.push(doc);
+          docMap.set(fCode, list);
+        }
       }
     }
 
@@ -70,7 +97,7 @@ export class ExcelService {
       { width: 5 },
       { width: 32 },
       { width: 45 },
-      { width: 25 },
+      { width: 35 },
     ];
 
     summarySheet.addRow([]);
@@ -91,9 +118,11 @@ export class ExcelService {
     metaHeader.getCell(4).font = headerFont;
 
     const metaRows = [
-      ['Institution / Submitter Name', userName, ''],
-      ['Department', department, ''],
-      ['Generated On', new Date().toISOString().split('T')[0], 'Local Export'],
+      ['Institution / Submitter Name', userName || 'Local User', ''],
+      ['Department', department || 'Department', ''],
+      ['Admin Email', 'datacollection0709@gmail.com', 'Recipient'],
+      ['Total Attached Documents', documents.length.toString(), 'Drive Linked'],
+      ['Generated On', new Date().toLocaleString(), 'Institutional Export'],
     ];
 
     for (const r of metaRows) {
@@ -126,8 +155,8 @@ export class ExcelService {
         { key: 'proofs', width: 45 },
       ];
 
-      const colLastTitle = sec.code === '3.3' || sec.code === '3.5' ? 'Remarks / Proofs' : 'Proofs';
-      const headerRow = sheet.addRow(['Sr. No.', 'Facility', '2023-24', '2024-25', '2025-26', colLastTitle]);
+      const colLastTitle = sec.code === '3.3' || sec.code === '3.5' ? 'Remarks / Proofs' : 'Proofs & Drive Links';
+      const headerRow = sheet.addRow(['Sr. No.', 'Facility / Indicator', '2023-24', '2024-25', '2025-26', colLastTitle]);
       headerRow.height = 28;
 
       headerRow.eachCell((cell) => {
@@ -139,19 +168,32 @@ export class ExcelService {
       headerRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' };
 
       for (const field of sec.fields) {
-        const v1 = valueMap.get(`${field.id}_y-2023-24`);
-        const v2 = valueMap.get(`${field.id}_y-2024-25`);
-        const v3 = valueMap.get(`${field.id}_y-2025-26`);
+        const getVal = (yrCode: string, yrId: string) => {
+          return (
+            valueMap.get(`${field.code}_${yrCode}`) ||
+            valueMap.get(`${field.id}_${yrId}`) ||
+            valueMap.get(`${field.code}_${yrId}`) ||
+            valueMap.get(`${field.id}_${yrCode}`)
+          );
+        };
+
+        const v1 = getVal('2023-24', 'y-2023-24');
+        const v2 = getVal('2024-25', 'y-2024-25');
+        const v3 = getVal('2025-26', 'y-2025-26');
 
         const formatValue = (v?: any) => {
           if (!v) return '—';
-          if (v.isNotApplicable) return '-----';
+          if (v.isNotApplicable) return 'N/A';
 
           if (field.fieldType === 'CURRENCY') {
-            return v.numericValue !== null && v.numericValue !== undefined ? `₹ ${v.numericValue.toLocaleString('en-IN')}` : '—';
+            return v.numericValue !== null && v.numericValue !== undefined && !isNaN(v.numericValue)
+              ? `₹ ${Number(v.numericValue).toLocaleString('en-IN')}`
+              : (v.textValue || '—');
           }
           if (field.fieldType === 'PERCENTAGE') {
-            return v.numericValue !== null && v.numericValue !== undefined ? `${v.numericValue.toFixed(2)}%` : '—';
+            return v.numericValue !== null && v.numericValue !== undefined && !isNaN(v.numericValue)
+              ? `${Number(v.numericValue).toFixed(2)}%`
+              : (v.textValue || '—');
           }
           if (field.fieldType === 'RATIO') {
             if (v.textValue) return v.textValue;
@@ -159,10 +201,17 @@ export class ExcelService {
               const r = Math.round(v.ratioNumerator / v.ratioDenominator);
               return `1:${r} (${v.ratioNumerator})`;
             }
-            return v.numericValue !== null && v.numericValue !== undefined ? `1:${v.numericValue}` : '—';
+            return v.numericValue !== null && v.numericValue !== undefined && !isNaN(v.numericValue)
+              ? `1:${v.numericValue}`
+              : '—';
           }
           if (field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL') {
-            return v.numericValue !== null && v.numericValue !== undefined ? v.numericValue : '—';
+            return v.numericValue !== null && v.numericValue !== undefined && !isNaN(v.numericValue)
+              ? v.numericValue
+              : (v.textValue || '—');
+          }
+          if (field.fieldType === 'BOOLEAN') {
+            return v.textValue || (v.numericValue === 1 ? 'Yes' : v.numericValue === 0 ? 'No' : '—');
           }
           return v.textValue || '—';
         };
@@ -172,7 +221,16 @@ export class ExcelService {
         const val3 = formatValue(v3);
 
         const remarks = [v1?.remarks, v2?.remarks, v3?.remarks].filter(Boolean);
-        let proofRemarkText = remarks.length > 0 ? Array.from(new Set(remarks)).join('; ') : '—';
+        const docs = docMap.get(field.code) || [];
+        const docTexts = docs.map((d: any) => {
+          if (d.fileUrl && d.fileUrl !== '#') {
+            return `${d.originalFileName || 'File'} (${d.fileUrl})`;
+          }
+          return d.originalFileName || 'File Attached';
+        });
+
+        const combined = [...docTexts, ...remarks];
+        const proofRemarkText = combined.length > 0 ? Array.from(new Set(combined)).join('; ') : '—';
 
         const dataRow = sheet.addRow([
           field.code,
@@ -200,6 +258,7 @@ export class ExcelService {
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    saveAs(blob, `Attribute_3_${department.replace(/\s+/g, '_')}_Report.xlsx`);
+    const cleanDept = (department || 'Institutional').replace(/[^a-zA-Z0-9_-]/g, '_');
+    saveAs(blob, `Attribute_3_${cleanDept}_Report.xlsx`);
   }
 }

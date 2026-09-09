@@ -17,8 +17,81 @@ class LocalApiClient {
     localStorage.setItem('attribute3_submissions', JSON.stringify(data));
   }
 
-  private delay(ms = 300) {
+  private delay(ms = 250) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  computeProgress(submission: any) {
+    const sections = attribute3Schema.attribute.sections;
+    const years = attribute3Schema.years;
+    const values = submission?.values || [];
+    const documents = submission?.documents || [];
+
+    const valueMap = new Map<string, any>();
+    for (const v of values) {
+      const fCode = v.fieldCode || v.field?.code;
+      const yCode = v.yearCode || v.year?.code;
+      if (fCode && yCode) {
+        valueMap.set(`${fCode}_${yCode}`, v);
+      }
+    }
+
+    let totalRequired = 0;
+    let completedRequired = 0;
+    const sectionProgress = [];
+    const missingRequiredProofs = [];
+
+    for (const sec of sections) {
+      let secTotal = 0;
+      let secCompleted = 0;
+      const missingFieldCodes: string[] = [];
+
+      for (const field of sec.fields) {
+        if (field.proofRequired) {
+          const hasProof = documents.some((d: any) => (d.fieldCode || d.field?.code) === field.code);
+          if (!hasProof) {
+            missingRequiredProofs.push({ fieldCode: field.code, label: field.label });
+          }
+        }
+
+        for (const yr of years) {
+          secTotal++;
+          totalRequired++;
+          const val = valueMap.get(`${field.code}_${yr.code}`);
+          const isFilled = val && (
+            val.isNotApplicable === true ||
+            (val.numericValue !== null && val.numericValue !== undefined && !isNaN(val.numericValue)) ||
+            (val.textValue !== null && val.textValue !== undefined && String(val.textValue).trim() !== '')
+          );
+
+          if (isFilled) {
+            secCompleted++;
+            completedRequired++;
+          } else {
+            if (!missingFieldCodes.includes(field.code)) {
+              missingFieldCodes.push(field.code);
+            }
+          }
+        }
+      }
+
+      const secPct = secTotal > 0 ? Math.round((secCompleted / secTotal) * 100) : 100;
+      sectionProgress.push({
+        sectionCode: sec.code,
+        percentage: secPct,
+        missingFieldCodes,
+      });
+    }
+
+    const overallPct = totalRequired > 0 ? Math.round((completedRequired / totalRequired) * 100) : 0;
+    return {
+      overallPercentage: overallPct,
+      completedRequiredFields: completedRequired,
+      totalRequiredFields: totalRequired,
+      documentsCount: documents.length,
+      sectionProgress,
+      missingRequiredProofs,
+    };
   }
 
   // Auth
@@ -88,28 +161,56 @@ class LocalApiClient {
       this.saveSubmissionsData(subs);
     }
     
-    return { success: true, submission: current, progress: { total: 0, completed: 0, percentage: 0 } };
+    const progress = this.computeProgress(current);
+    return { success: true, submission: current, progress };
   }
 
   async getSubmissionById(id: string) {
     await this.delay();
     const subs = this.getSubmissionsData();
     if (subs[id]) {
-      return { success: true, submission: subs[id], progress: { total: 0, completed: 0, percentage: 0 } };
+      const progress = this.computeProgress(subs[id]);
+      return { success: true, submission: subs[id], progress };
     }
     throw new Error('Submission not found');
   }
 
   async saveDraft(id: string, values: any[]) {
-    await this.delay(500); // Simulate network
+    await this.delay(200);
     const subs = this.getSubmissionsData();
     if (!subs[id]) {
       subs[id] = { id, status: 'DRAFT', values: [], documents: [] };
     }
-    subs[id].values = values;
+
+    // Merge values by fieldCode_yearCode to prevent wiping previous sections
+    const valMap = new Map<string, any>();
+    (subs[id].values || []).forEach((v: any) => {
+      const fCode = v.fieldCode || v.field?.code;
+      const yCode = v.yearCode || v.year?.code;
+      if (fCode && yCode) {
+        valMap.set(`${fCode}_${yCode}`, v);
+      }
+    });
+
+    (values || []).forEach((v: any) => {
+      const fCode = v.fieldCode || v.field?.code;
+      const yCode = v.yearCode || v.year?.code;
+      if (fCode && yCode) {
+        valMap.set(`${fCode}_${yCode}`, {
+          ...valMap.get(`${fCode}_${yCode}`),
+          ...v,
+          fieldCode: fCode,
+          yearCode: yCode,
+        });
+      }
+    });
+
+    subs[id].values = Array.from(valMap.values());
     subs[id].updatedAt = new Date().toISOString();
     this.saveSubmissionsData(subs);
-    return { success: true, savedAt: new Date().toISOString(), progress: { total: 0, completed: 0, percentage: 0 } };
+
+    const progress = this.computeProgress(subs[id]);
+    return { success: true, savedAt: new Date().toISOString(), progress };
   }
 
   async submitForReview(id: string) {
@@ -124,6 +225,7 @@ class LocalApiClient {
       
       const payload = {
         action: 'submitForm',
+        adminEmail: 'datacollection0709@gmail.com',
         userName: user?.name || 'Local User',
         department: user?.organizationName || 'Department',
         submissionData: sub.values,
@@ -151,7 +253,7 @@ class LocalApiClient {
 
     sub.status = 'SUBMITTED';
     this.saveSubmissionsData(subs);
-    return { success: true, message: 'Submitted successfully', submission: sub };
+    return { success: true, message: 'Submitted successfully to datacollection0709@gmail.com', submission: sub };
   }
 
   async reviewSubmission(id: string, action: 'APPROVE' | 'REJECT', reason?: string) {
@@ -200,6 +302,7 @@ class LocalApiClient {
 
       const payload = {
         action: 'uploadFile',
+        adminEmail: 'datacollection0709@gmail.com',
         fileName: file.name,
         mimeType: file.type,
         base64Data: base64Data,
@@ -256,7 +359,6 @@ class LocalApiClient {
   async deleteDocument(id: string) {
     await this.delay();
     const subs = this.getSubmissionsData();
-    // We would need to search across all submissions to delete the document locally
     for (const subId in subs) {
       if (subs[subId].documents) {
         subs[subId].documents = subs[subId].documents.filter((d: any) => d.id !== id);
@@ -284,9 +386,10 @@ class LocalApiClient {
 
     const user = this.getLocalUser();
     await ExcelService.generateAndDownloadAttribute3Workbook(
-      sub.values,
+      sub.values || [],
       user?.name || 'Local User',
-      user?.organizationName || 'Department'
+      user?.organizationName || 'Department',
+      sub.documents || []
     );
   }
 
