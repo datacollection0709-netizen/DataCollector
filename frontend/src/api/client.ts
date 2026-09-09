@@ -338,6 +338,8 @@ class LocalApiClient {
         fileSize: 45200,
         mimeType: 'image/png',
         dataUrl: sampleClassroomPhoto,
+        fileUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1200&q=80',
+        hyperlink: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=1200&q=80',
         uploadedAt: new Date().toISOString(),
       },
       {
@@ -347,6 +349,8 @@ class LocalApiClient {
         fileSize: 52100,
         mimeType: 'image/png',
         dataUrl: sampleLabPhoto,
+        fileUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
+        hyperlink: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=1200&q=80',
         uploadedAt: new Date().toISOString(),
       },
       {
@@ -355,6 +359,7 @@ class LocalApiClient {
         fileName: 'DELNET_Consortium_Certificate.pdf',
         fileSize: 120000,
         mimeType: 'application/pdf',
+        fileUrl: 'https://drive.google.com/file/d/1demo-delnet-consortium-certificate/view',
         hyperlink: 'https://drive.google.com/file/d/1demo-delnet-consortium-certificate/view',
         uploadedAt: new Date().toISOString(),
       },
@@ -461,10 +466,15 @@ class LocalApiClient {
       emailFormData.append('Message', 'Attached is your official Attribute 3 Institutional Excel report (.xlsx) containing all answered indicators, calculations, and embedded photo evidence.');
       emailFormData.append('Summary_Data', summaryLines);
 
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://datacollector.vercel.app';
+      const referer = typeof window !== 'undefined' ? window.location.href : 'https://datacollector.vercel.app/';
+
       await fetch(`https://formsubmit.co/ajax/${adminEmail}`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
+          'Origin': origin,
+          'Referer': referer,
         },
         body: emailFormData,
       });
@@ -474,6 +484,19 @@ class LocalApiClient {
 
     // 2. Dispatch to Vercel Serverless Function /api/submit
     try {
+      let excelBase64 = '';
+      if (excelBlob) {
+        excelBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const res = reader.result as string;
+            resolve(res.includes('base64,') ? res.split('base64,')[1] : res);
+          };
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(excelBlob!);
+        });
+      }
+
       await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -483,6 +506,8 @@ class LocalApiClient {
           department: user?.organizationName || 'Department',
           submissionData: sub.values,
           documents: fullDocs,
+          excelBase64,
+          excelFileName,
         }),
       });
     } catch (e) {
@@ -593,6 +618,53 @@ class LocalApiClient {
       });
     }
 
+    // Upload to cloud (Google Drive if configured, or tmpfiles.org) to obtain an immediate public URL that Excel can open!
+    let cloudUrl = '';
+
+    const googleScriptUrl = (import.meta as any).env?.VITE_GOOGLE_SCRIPT_URL;
+    if (googleScriptUrl) {
+      try {
+        const gRes = await fetch(googleScriptUrl, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'uploadFile',
+            fileName: file.name,
+            mimeType: file.type,
+            base64Data: dataUrl.includes('base64,') ? dataUrl.split('base64,')[1] : '',
+          }),
+        });
+        const gJson = await gRes.json();
+        if (gJson?.fileUrl) {
+          cloudUrl = gJson.fileUrl;
+        }
+      } catch (e) {
+        console.warn('Google Script upload failed:', e);
+      }
+    }
+
+    if (!cloudUrl) {
+      try {
+        const upForm = new FormData();
+        upForm.append('file', file, file.name);
+        const tmpRes = await fetch('https://tmpfiles.org/api/v1/upload', {
+          method: 'POST',
+          body: upForm,
+        });
+        if (tmpRes.ok) {
+          const tmpJson = await tmpRes.json();
+          if (tmpJson?.data?.url) {
+            cloudUrl = tmpJson.data.url;
+          }
+        }
+      } catch (e) {
+        console.warn('tmpfiles upload failed:', e);
+      }
+    }
+
+    if (!cloudUrl) {
+      cloudUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(file.name)}`;
+    }
+
     // Save to IndexedDB (proofStorage)
     const storedProof: StoredProof = {
       id: fileId,
@@ -602,6 +674,8 @@ class LocalApiClient {
       fileSize: file.size,
       mimeType: file.type,
       dataUrl,
+      fileUrl: cloudUrl,
+      hyperlink: cloudUrl,
       uploadedAt: new Date().toISOString(),
     };
     await proofStorage.saveProof(storedProof);
@@ -614,7 +688,8 @@ class LocalApiClient {
       fileSize: file.size,
       mimeType: file.type,
       uploadedAt: new Date().toISOString(),
-      fileUrl: '#',
+      fileUrl: cloudUrl,
+      hyperlink: cloudUrl,
       dataUrl,
     };
 

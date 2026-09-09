@@ -302,17 +302,24 @@ export class ExcelService {
           return (isImgMime || isImgData || isImgExt) && (d.dataUrl || d.fileUrl);
         }).slice(0, 3);
 
-        // First hyperlink if any
-        const hyperlinkDoc = docs.find((d: any) => d.hyperlink || (d.fileUrl && d.fileUrl !== '#'));
+        // Find primary clickable target URL for this field
+        const primaryDoc = docs.find((d: any) => (d.hyperlink && d.hyperlink !== '#') || (d.fileUrl && d.fileUrl !== '#'));
+        const primaryUrl = primaryDoc ? (primaryDoc.hyperlink || primaryDoc.fileUrl) : null;
 
         const textParts: string[] = [];
         for (const d of docs) {
-          if (d.hyperlink) {
-            textParts.push(`🔗 [Link] ${d.originalFileName || d.fileName || 'Drive Link'}`);
-          } else if (d.mimeType === 'application/pdf' || d.originalFileName?.endsWith('.pdf')) {
-            textParts.push(`📄 [PDF] ${d.originalFileName || d.fileName || 'Document'}`);
-          } else if (!photoDocs.includes(d)) {
-            textParts.push(`📎 ${d.originalFileName || d.fileName || 'Proof'}`);
+          const isPhoto = photoDocs.includes(d);
+          const name = d.originalFileName || d.fileName || 'Proof Document';
+          const docUrl = d.hyperlink || (d.fileUrl && d.fileUrl !== '#' ? d.fileUrl : null);
+
+          if (isPhoto) {
+            textParts.push(`📷 [Photo] ${name} (Click to Open)`);
+          } else if (d.mimeType === 'application/pdf' || name.toLowerCase().endsWith('.pdf')) {
+            textParts.push(`📄 [PDF] ${name} (Click to Open)`);
+          } else if (docUrl) {
+            textParts.push(`🔗 [Drive Link] ${name}`);
+          } else {
+            textParts.push(`📎 ${name}`);
           }
         }
 
@@ -322,7 +329,7 @@ export class ExcelService {
         }
 
         if (photoDocs.length > 0) {
-          textParts.unshift(`📷 ${photoDocs.length} Photo${photoDocs.length > 1 ? 's' : ''} Attached:`);
+          textParts.unshift(`📷 ${photoDocs.length} Photo${photoDocs.length > 1 ? 's' : ''} Attached (Click to Open):`);
         }
 
         const proofCellText = textParts.length > 0 ? textParts.join('\n') : '—';
@@ -338,17 +345,20 @@ export class ExcelService {
 
         const rowIndex = dataRow.number;
 
-        // If the proof has a real web or Drive hyperlink, make the cell a native clickable hyperlink!
-        if (hyperlinkDoc) {
-          const targetUrl = hyperlinkDoc.hyperlink || hyperlinkDoc.fileUrl;
-          if (targetUrl && targetUrl !== '#') {
-            dataRow.getCell(6).value = {
-              text: proofCellText,
-              hyperlink: targetUrl,
-              tooltip: 'Click to open full document / photo in your web browser',
-            };
-            dataRow.getCell(6).font = { name: 'Arial', size: 9, color: { argb: 'FF1D4ED8' }, underline: true };
-          }
+        // If a real web or Drive link exists, make the cell a native clickable hyperlink in Excel!
+        if (primaryUrl && primaryUrl !== '#') {
+          dataRow.getCell(6).value = {
+            text: proofCellText,
+            hyperlink: primaryUrl,
+            tooltip: `Click to open ${primaryDoc?.originalFileName || 'proof document'} in your browser`,
+          };
+          dataRow.getCell(6).font = {
+            name: 'Arial',
+            size: 9.5,
+            color: { argb: 'FF1D4ED8' },
+            underline: true,
+            bold: true,
+          };
         }
 
         // Set row height based on whether photos are embedded
@@ -373,7 +383,7 @@ export class ExcelService {
         });
 
         // ==========================================
-        // STRATEGY 1: EMBED IN-CELL PHOTO THUMBNAILS
+        // STRATEGY 1: EMBED IN-CELL PHOTO THUMBNAILS WITH DIRECT CLICKABLE HYPERLINKS
         // ==========================================
         if (photoDocs.length > 0) {
           photoDocs.forEach((pDoc: any, pIdx: number) => {
@@ -389,11 +399,22 @@ export class ExcelService {
                   extension: ext,
                 });
 
+                const photoUrl = pDoc.hyperlink || (pDoc.fileUrl && pDoc.fileUrl !== '#' ? pDoc.fileUrl : primaryUrl);
+
                 // Place thumbnails side-by-side inside Column F (0-indexed col 5)
+                // WITH native drawing hyperlink so clicking the photo in Excel opens it in the browser!
                 sheet.addImage(imageId, {
                   tl: { col: 5.08 + pIdx * 1.15, row: rowIndex - 0.78 },
                   ext: { width: 72, height: 50 },
                   editAs: 'oneCell',
+                  ...(photoUrl && photoUrl !== '#'
+                    ? {
+                        hyperlinks: {
+                          hyperlink: photoUrl,
+                          tooltip: `Click to open full photo (${pDoc.originalFileName || 'image'}) in browser`,
+                        },
+                      }
+                    : {}),
                 });
               }
             } catch (imgErr) {
@@ -416,19 +437,19 @@ export class ExcelService {
         { width: 4 },
         { width: 14 },
         { width: 36 },
-        { width: 30 },
-        { width: 42 },
+        { width: 32 },
+        { width: 44 },
       ];
 
       visualSheet.addRow([]);
       const vTitle = visualSheet.addRow(['', 'AUDIT EVIDENCE: PHOTO REPOSITORY', '', '', '']);
       vTitle.getCell(2).font = titleFont;
 
-      const vSub = visualSheet.addRow(['', 'High-Resolution Geotagged Visual Evidence for Attribute 3', '', '', '']);
+      const vSub = visualSheet.addRow(['', 'High-Resolution Geotagged Visual Evidence for Attribute 3 (Click any photo to open)', '', '', '']);
       vSub.getCell(2).font = subtitleFont;
       visualSheet.addRow([]);
 
-      const vHeader = visualSheet.addRow(['', 'Indicator', 'Facility / Resource', 'Photo Details', 'Embedded High-Resolution Photo']);
+      const vHeader = visualSheet.addRow(['', 'Indicator', 'Facility / Resource', 'Photo Details & Clickable Link', 'Embedded High-Resolution Photo (Click to Open)']);
       vHeader.getCell(2).fill = headerFill;
       vHeader.getCell(2).font = headerFont;
       vHeader.getCell(3).fill = headerFill;
@@ -442,13 +463,16 @@ export class ExcelService {
         const rawData = item.doc.dataUrl || item.doc.fileUrl;
         const fileName = item.doc.originalFileName || item.doc.fileName || `Photo_${idx + 1}.png`;
         const sizeStr = item.doc.fileSize > 0 ? `${(item.doc.fileSize / 1024).toFixed(1)} KB` : 'Attached Image';
+        const photoUrl = item.doc.hyperlink || (item.doc.fileUrl && item.doc.fileUrl !== '#' ? item.doc.fileUrl : null);
+
+        const detailsText = `File: ${fileName}\nSize: ${sizeStr}\nUploaded: ${new Date(item.doc.uploadedAt || Date.now()).toLocaleDateString()}${photoUrl ? `\n🔗 Click here to open file in browser` : ''}`;
 
         const row = visualSheet.addRow([
           '',
           item.fieldCode,
           item.fieldLabel,
-          `File: ${fileName}\nSize: ${sizeStr}\nUploaded: ${new Date(item.doc.uploadedAt || Date.now()).toLocaleDateString()}`,
-          '',
+          detailsText,
+          photoUrl ? `🔗 Click to Open Full Photo (${fileName})` : 'Embedded Photo',
         ]);
 
         row.height = 140; // High-resolution photo card height
@@ -457,12 +481,30 @@ export class ExcelService {
         row.getCell(2).font = { name: 'Arial', size: 10, bold: true };
         row.getCell(3).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
         row.getCell(4).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-        row.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(5).alignment = { vertical: 'bottom', horizontal: 'center', wrapText: true };
 
         row.getCell(2).border = borderStyle;
         row.getCell(3).border = borderStyle;
         row.getCell(4).border = borderStyle;
         row.getCell(5).border = borderStyle;
+
+        if (photoUrl && photoUrl !== '#') {
+          // Add clickable link on Details cell (Column 4)
+          row.getCell(4).value = {
+            text: detailsText,
+            hyperlink: photoUrl,
+            tooltip: `Click to open ${fileName} in your browser`,
+          };
+          row.getCell(4).font = { name: 'Arial', size: 9.5, color: { argb: 'FF1D4ED8' } };
+
+          // Add clickable link on Photo cell (Column 5)
+          row.getCell(5).value = {
+            text: `🔗 Click to Open Full Photo (${fileName})`,
+            hyperlink: photoUrl,
+            tooltip: `Click to open ${fileName} in your browser`,
+          };
+          row.getCell(5).font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FF1D4ED8' }, underline: true };
+        }
 
         if (rawData && rawData.includes('base64,')) {
           try {
@@ -477,8 +519,16 @@ export class ExcelService {
 
             visualSheet.addImage(imgId, {
               tl: { col: 4.15, row: row.number - 0.92 },
-              ext: { width: 190, height: 130 },
+              ext: { width: 190, height: 110 },
               editAs: 'oneCell',
+              ...(photoUrl && photoUrl !== '#'
+                ? {
+                    hyperlinks: {
+                      hyperlink: photoUrl,
+                      tooltip: `Click to open full photo (${fileName}) in browser`,
+                    },
+                  }
+                : {}),
             });
           } catch (e) {
             console.warn('High-res gallery image error:', e);

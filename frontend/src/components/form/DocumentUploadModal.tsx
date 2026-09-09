@@ -115,7 +115,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       formData.append('dataUrl', dataUrl);
 
       await api.uploadDocument(formData);
-      setSuccessMsg(`"${file.name}" uploaded successfully! (Embedded in Excel)`);
+      setSuccessMsg(`"${file.name}" uploaded successfully! Embedded in Excel report & clickable to open full view.`);
       onDocumentChange();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -158,7 +158,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         hyperlink: finalUrl,
       });
 
-      setSuccessMsg(`Hyperlink "${linkTitle}" saved and linked!`);
+      setSuccessMsg(`Hyperlink "${linkTitle}" saved! Embedded and clickable in Excel.`);
       setHyperlinkInput('');
       setHyperlinkLabel('');
       onDocumentChange();
@@ -209,6 +209,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       maxWidth="lg"
     >
       <div className="space-y-4">
+        {/* Informational Guidance Alert */}
+        <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs">
+          <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+          <span>
+            <strong>Clickable In Excel:</strong> All attached photos and documents are embedded with direct links. Clicking the photo or link in your generated Excel report opens the full file in your browser!
+          </span>
+        </div>
+
         {/* Alerts */}
         {errorMsg && (
           <div className="flex items-start gap-2 p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs">

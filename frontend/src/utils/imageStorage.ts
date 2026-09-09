@@ -8,6 +8,7 @@ export interface StoredProof {
   mimeType: string;
   dataUrl?: string; // Base64 data URL for images/PDFs
   hyperlink?: string; // External URL / Drive link
+  fileUrl?: string; // Public HTTPS direct link
   uploadedAt: string;
 }
 

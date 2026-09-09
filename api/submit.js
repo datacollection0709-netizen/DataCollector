@@ -18,7 +18,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userName, department, submissionData, documents = [], adminEmail = 'datacollection0709@gmail.com' } = req.body;
+    const {
+      userName,
+      department,
+      submissionData,
+      documents = [],
+      adminEmail = 'datacollection0709@gmail.com',
+      excelBase64,
+      excelFileName = 'Attribute_3_Report.xlsx',
+    } = req.body;
 
     // Filter populated values
     const filledValues = (submissionData || []).filter(
@@ -28,7 +36,7 @@ export default async function handler(req, res) {
     const summaryText = filledValues
       .map((v) => {
         const val = v.isNotApplicable ? 'N/A' : (v.numericValue !== null && v.numericValue !== undefined ? v.numericValue : (v.textValue || '—'));
-        return `[${v.fieldCode}] (${v.yearCode}): ${val}`;
+        return `• [${v.fieldCode}] (${v.yearCode}): ${val}`;
       })
       .join('\n');
 
@@ -37,26 +45,32 @@ export default async function handler(req, res) {
       return `${i + 1}. [${d.fieldCode}] ${d.originalFileName || d.fileName || 'Proof'}: ${link}`;
     }).join('\n') || 'None attached';
 
-    // Forward to FormSubmit to deliver directly to datacollection0709@gmail.com
+    // Forward to FormSubmit to deliver directly to datacollection0709@gmail.com with Excel attached
     try {
-      await fetch(`https://formsubmit.co/ajax/${adminEmail}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Origin': 'https://datacollector.vercel.app',
-          'Referer': 'https://datacollector.vercel.app/',
-        },
-        body: JSON.stringify({
-          _subject: `New Attribute 3 Audit Submission: ${userName} (${department})`,
-          Submitter: userName || 'Institutional Officer',
-          Department: department || 'Department',
-          Total_Answered_Entries: filledValues.length,
-          Attached_Proofs_Count: documents.length,
-          Proofs_And_Links: proofsSummary,
-          Submission_Summary: summaryText,
-        }),
-      });
+      if (excelBase64) {
+        const formData = new FormData();
+        const buffer = Buffer.from(excelBase64, 'base64');
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        formData.append('attachment', blob, excelFileName);
+        formData.append('_subject', `Attribute 3 Institutional Excel Report: ${userName || 'Officer'} (${department || 'Dept'})`);
+        formData.append('Submitter_Name', userName || 'Institutional Officer');
+        formData.append('Department', department || 'Department');
+        formData.append('Total_Answered_Entries', String(filledValues.length));
+        formData.append('Attached_Proofs_Count', String(documents.length));
+        formData.append('Proofs_and_Links', proofsSummary);
+        formData.append('Message', 'Attached is your official Attribute 3 Institutional Excel report (.xlsx) containing all answered indicators, calculations, and embedded photo evidence.');
+        formData.append('Summary_Data', summaryText);
+
+        await fetch(`https://formsubmit.co/ajax/${adminEmail}`, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Origin': 'https://datacollector.vercel.app',
+            'Referer': 'https://datacollector.vercel.app/',
+          },
+          body: formData,
+        });
+      }
     } catch (err) {
       console.warn('FormSubmit forwarding error:', err);
     }
