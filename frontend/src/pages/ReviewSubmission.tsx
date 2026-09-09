@@ -366,7 +366,14 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                                     return (
                                       <div
                                         key={d.id || dIdx}
-                                        className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-[11px]"
+                                        onClick={() => {
+                                          const target = d.hyperlink || d.dataUrl || d.fileUrl;
+                                          if (target && target !== '#') {
+                                            window.open(target, '_blank');
+                                          }
+                                        }}
+                                        className="flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg text-[11px] cursor-pointer transition-colors"
+                                        title="Click to open full view"
                                       >
                                         {isPhoto && d.dataUrl ? (
                                           <img

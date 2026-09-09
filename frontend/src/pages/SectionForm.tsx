@@ -618,76 +618,55 @@ export const SectionForm: React.FC<SectionFormProps> = ({
 
                         {/* Actions, Proof Photos & Hyperlinks */}
                         <td className="py-2.5 px-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                            {/* N/A Toggle */}
-                            <button
-                              type="button"
-                              onClick={() => handleToggleNA(field)}
-                              className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-all ${
-                                isAllNA
-                                  ? 'bg-amber-100 text-amber-800 border-amber-300'
-                                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200'
-                              }`}
-                              title="Toggle Not Applicable"
-                            >
-                              {isAllNA ? 'N/A' : 'Set N/A'}
-                            </button>
-
-                            {/* Proofs & Photos Button */}
+                          <div className="flex items-center justify-center gap-2">
+                            {/* Unified Clean Evidence Pill */}
                             <button
                               type="button"
                               onClick={() => setSelectedUploadField(field)}
-                              className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-all flex items-center gap-1 ${
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
                                 hasProof
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+                                  : 'bg-slate-50 text-slate-500 border border-dashed border-slate-300 hover:border-slate-400 hover:text-slate-700'
                               }`}
-                              title={hasProof ? `${fieldDocs.length} proof(s) attached (Max 3)` : 'Add photo proof or link'}
+                              title={hasProof ? `${fieldDocs.length} proof(s) attached. Click to manage/open.` : 'Attach photos, PDFs, or Drive links'}
                             >
-                              <Paperclip className="w-3.5 h-3.5" />
-                              <span>{hasProof ? `${fieldDocs.length}/3` : 'Add Proof'}</span>
-                              {photoDocs.length > 0 && (
-                                <span className="text-[9px] bg-emerald-200 text-emerald-800 px-1 rounded-full font-mono">
-                                  📷{photoDocs.length}
-                                </span>
+                              {photoDocs.length > 0 ? (
+                                <>
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                  <span>📷 {photoDocs.length} Photo{photoDocs.length > 1 ? 's' : ''}</span>
+                                </>
+                              ) : fieldDocs.some((d: any) => d.hyperlink) ? (
+                                <>
+                                  <ExternalLink className="w-3.5 h-3.5 text-brand-600" />
+                                  <span>Drive Link</span>
+                                </>
+                              ) : hasProof ? (
+                                <>
+                                  <Paperclip className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>{fieldDocs.length} Proof{fieldDocs.length > 1 ? 's' : ''}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-3 h-3 text-slate-400" />
+                                  <span>+ Proof / Link</span>
+                                </>
                               )}
                             </button>
 
-                            {/* Remarks toggle */}
+                            {/* Minimal Clean N/A Toggle */}
                             <button
                               type="button"
-                              onClick={() =>
-                                setActiveRemarkField(activeRemarkField === field.code ? null : field.code)
-                              }
-                              className={`p-1 rounded-md border transition-all ${
-                                activeRemarkField === field.code ||
-                                years.some((y) => formData[`${field.code}_${y.code}`]?.remarks)
-                                  ? 'bg-brand-50 text-brand-600 border-brand-200'
-                                  : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
+                              onClick={() => handleToggleNA(field)}
+                              className={`px-2 py-1 rounded-lg text-[11px] font-mono font-semibold transition-all border ${
+                                isAllNA
+                                  ? 'bg-amber-100 text-amber-800 border-amber-300 shadow-2xs'
+                                  : 'bg-white text-slate-400 border-slate-200 hover:text-slate-700 hover:border-slate-300'
                               }`}
-                              title="Notes / Remarks"
+                              title="Toggle Not Applicable for this facility"
                             >
-                              <MessageSquare className="w-3.5 h-3.5" />
+                              {isAllNA ? 'N/A' : 'Set N/A'}
                             </button>
                           </div>
-
-                          {/* Remarks drawer */}
-                          {activeRemarkField === field.code && (
-                            <div className="mt-2 text-left">
-                              <textarea
-                                rows={2}
-                                placeholder="Add contextual audit remarks..."
-                                value={years.map((y) => formData[`${field.code}_${y.code}`]?.remarks).filter(Boolean)[0] || ''}
-                                onChange={(e) => {
-                                  const text = e.target.value;
-                                  years.forEach((y) => {
-                                    handleFieldChange(y.code, field.code, { remarks: text });
-                                  });
-                                }}
-                                className="w-full text-[11px] p-2 rounded-lg border border-slate-200 focus:border-brand-500 outline-none"
-                              />
-                            </div>
-                          )}
                         </td>
                       </tr>
                     );

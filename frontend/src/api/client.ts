@@ -430,23 +430,43 @@ class LocalApiClient {
       })
       .join('\n') || 'None attached';
 
-    // 1. Dispatch email via FormSubmit API directly to datacollection0709@gmail.com
+    // Generate the official Excel workbook report with embedded photos and links
+    let excelBlob: Blob | null = null;
+    let excelFileName = 'Attribute_3_Report.xlsx';
     try {
+      const res = await ExcelService.generateAttribute3WorkbookBlob(
+        sub.values,
+        user?.name || 'Institutional Officer',
+        user?.organizationName || 'Department',
+        fullDocs
+      );
+      excelBlob = res.blob;
+      excelFileName = res.fileName;
+    } catch (e) {
+      console.warn('Workbook blob generation error:', e);
+    }
+
+    // 1. Dispatch email via FormSubmit with the REAL .xlsx file ATTACHED!
+    try {
+      const emailFormData = new FormData();
+      if (excelBlob) {
+        emailFormData.append('attachment', excelBlob, excelFileName);
+      }
+      emailFormData.append('_subject', `Attribute 3 Institutional Excel Report: ${user?.name || 'Officer'} (${user?.organizationName || 'Dept'})`);
+      emailFormData.append('Submitter_Name', user?.name || 'Institutional Officer');
+      emailFormData.append('Department', user?.organizationName || 'Academic Department');
+      emailFormData.append('Total_Answered_Entries', String(filledValues.length));
+      emailFormData.append('Attached_Proofs_Count', String(fullDocs.length));
+      emailFormData.append('Proofs_and_Links', proofsListText);
+      emailFormData.append('Message', 'Attached is your official Attribute 3 Institutional Excel report (.xlsx) containing all answered indicators, calculations, and embedded photo evidence.');
+      emailFormData.append('Summary_Data', summaryLines);
+
       await fetch(`https://formsubmit.co/ajax/${adminEmail}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify({
-          _subject: `New Attribute 3 Submission: ${user?.name || 'Officer'} (${user?.organizationName || 'Dept'})`,
-          Submitter_Name: user?.name || 'Institutional Officer',
-          Department: user?.organizationName || 'Academic Department',
-          Total_Filled_Entries: filledValues.length,
-          Attached_Proofs_Count: fullDocs.length,
-          Proofs_and_Links: proofsListText,
-          Submission_Summary: summaryLines,
-        }),
+        body: emailFormData,
       });
     } catch (e) {
       console.warn('FormSubmit dispatch notice:', e);
@@ -474,9 +494,14 @@ class LocalApiClient {
     sub.updatedAt = new Date().toISOString();
     this.saveSubmissionsData(subs);
 
-    // Auto trigger Excel download with in-cell embedded photos
+    // Auto trigger immediate browser download of the completed Excel workbook
     try {
-      await this.downloadExcel(id);
+      if (excelBlob) {
+        const { saveAs } = await import('file-saver');
+        saveAs(excelBlob, excelFileName);
+      } else {
+        await this.downloadExcel(id);
+      }
     } catch (e) {
       console.warn('Auto Excel download warning:', e);
     }

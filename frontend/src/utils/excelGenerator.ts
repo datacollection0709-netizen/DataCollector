@@ -4,15 +4,15 @@ import { attribute3Schema } from './schema';
 
 export class ExcelService {
   /**
-   * Generates a fully-formatted institutional workbook with in-cell embedded photos (Strategy 1)
-   * and clickable hyperlinks (Strategy 3).
+   * Generates the complete Attribute 3 Excel workbook as a Blob and ArrayBuffer
+   * containing in-cell photos, clickable hyperlinks, and a high-resolution Visual Evidence sheet.
    */
-  static async generateAndDownloadAttribute3Workbook(
+  static async generateAttribute3WorkbookBlob(
     submissionData: any,
     userName: string,
     department: string,
     documents: any[] = []
-  ) {
+  ): Promise<{ blob: Blob; buffer: ArrayBuffer; fileName: string }> {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Attribute 3 Institutional System';
     workbook.lastModifiedBy = userName || 'Institutional Auditor';
@@ -69,6 +69,8 @@ export class ExcelService {
       ? Object.values(documents)
       : [];
 
+    const allPhotoProofs: { fieldCode: string; fieldLabel: string; doc: any }[] = [];
+
     for (const doc of docList) {
       if (!doc) continue;
       const fCode = doc.fieldCode || doc.field?.code;
@@ -76,6 +78,24 @@ export class ExcelService {
         const list = docMap.get(fCode) || [];
         list.push(doc);
         docMap.set(fCode, list);
+
+        const isPhoto =
+          doc.mimeType?.startsWith('image/') ||
+          doc.dataUrl?.startsWith('data:image/') ||
+          /\.(jpg|jpeg|png|webp)$/i.test(doc.originalFileName || doc.fileName || '');
+
+        if (isPhoto && (doc.dataUrl || doc.fileUrl)) {
+          // Find field label
+          let fLabel = fCode;
+          for (const s of sections) {
+            const found = s.fields.find((f: any) => f.code === fCode);
+            if (found) {
+              fLabel = found.label;
+              break;
+            }
+          }
+          allPhotoProofs.push({ fieldCode: fCode, fieldLabel: fLabel, doc });
+        }
       }
     }
 
@@ -136,7 +156,6 @@ export class ExcelService {
     subTitleRow.getCell(2).font = subtitleFont;
     summarySheet.addRow([]);
 
-    // Institutional metadata table
     const metaHeader = summarySheet.addRow(['', 'Institutional Metadata', 'Value', 'Status Details']);
     metaHeader.getCell(2).fill = headerFill;
     metaHeader.getCell(2).font = headerFont;
@@ -149,10 +168,10 @@ export class ExcelService {
       ['Institution / Submitter Name', userName || 'Institutional Officer', 'Official Submitter'],
       ['Department', department || 'Academic Department', 'Academic Unit'],
       ['Admin Email', 'datacollection0709@gmail.com', 'Recipient Mailbox'],
-      ['Total Attached Proofs', `${docList.length} files/links`, 'Photos Embedded & Hyperlinks'],
-      ['Audit Academic Years', '2023–24, 2024–25, 2025–26', 'Three-Year Accreditation Window'],
+      ['Total Attached Proofs', `${docList.length} files/links`, 'Photos Embedded & Clickable Links'],
+      ['Audit Academic Years', '2023–24, 2024–25, 2025–26', 'Accreditation Window'],
       ['Report Status', useBaseline ? 'Baseline Audit Demonstration' : 'Official Data Entry Completed', 'Verified'],
-      ['Generated On', new Date().toLocaleString(), 'Institutional System Export'],
+      ['Generated On', new Date().toLocaleString(), 'Institutional Export'],
     ];
 
     for (const r of metaRows) {
@@ -181,7 +200,7 @@ export class ExcelService {
         { key: 'y1', width: 20 },
         { key: 'y2', width: 20 },
         { key: 'y3', width: 20 },
-        { key: 'proofs', width: 55 }, // Wide column for in-cell photo thumbnails & hyperlinks
+        { key: 'proofs', width: 56 }, // Wide column for in-cell thumbnails & clickable links
       ];
 
       const headerRow = sheet.addRow([
@@ -190,7 +209,7 @@ export class ExcelService {
         '2023-24',
         '2024-25',
         '2025-26',
-        'Proofs, In-Cell Photos & Links',
+        'Proofs, In-Cell Photos & Clickable Links',
       ]);
       headerRow.height = 28;
 
@@ -244,12 +263,12 @@ export class ExcelService {
 
           // Baseline fallback if user exports before filling
           if (useBaseline) {
-            if (field.fieldType === 'NUMBER') return 10 + (fIdx * 2) + (yrIdx * 2);
+            if (field.fieldType === 'NUMBER') return 10 + fIdx * 2 + yrIdx * 2;
             if (field.fieldType === 'CURRENCY') {
-              const amt = field.code === '3.2.1a' ? 450000 + (yrIdx * 70000) : 8500000 + (yrIdx * 1000000);
+              const amt = field.code === '3.2.1a' ? 450000 + yrIdx * 70000 : 8500000 + yrIdx * 1000000;
               return `₹ ${amt.toLocaleString('en-IN')}`;
             }
-            if (field.fieldType === 'PERCENTAGE') return `${(5.29 + (yrIdx * 0.26)).toFixed(2)}%`;
+            if (field.fieldType === 'PERCENTAGE') return `${(5.29 + yrIdx * 0.26).toFixed(2)}%`;
             if (field.fieldType === 'BOOLEAN') return 'Yes';
             if (field.fieldType === 'RATIO') return `1:${15 - yrIdx}`;
             if (field.fieldType === 'TEXT') {
@@ -272,24 +291,26 @@ export class ExcelService {
         const val2 = formatValue(v2, 1);
         const val3 = formatValue(v3, 2);
 
-        // Docs for this field
+        // Attached docs for this field
         const docs = docMap.get(field.code) || [];
 
-        // Identify photos for Strategy 1 (in-cell thumbnails)
+        // Identify photos for in-cell embedding (up to 3 photos)
         const photoDocs = docs.filter((d: any) => {
           const isImgMime = d.mimeType?.startsWith('image/');
           const isImgData = d.dataUrl?.startsWith('data:image/');
           const isImgExt = /\.(jpg|jpeg|png|webp)$/i.test(d.originalFileName || d.fileName || '');
           return (isImgMime || isImgData || isImgExt) && (d.dataUrl || d.fileUrl);
-        }).slice(0, 3); // Max 3 photos
+        }).slice(0, 3);
 
-        // Identify hyperlinks (Strategy 3) and documents
+        // First hyperlink if any
+        const hyperlinkDoc = docs.find((d: any) => d.hyperlink || (d.fileUrl && d.fileUrl !== '#'));
+
         const textParts: string[] = [];
         for (const d of docs) {
           if (d.hyperlink) {
-            textParts.push(`🔗 ${d.originalFileName || d.fileName || 'Drive Link'}: ${d.hyperlink}`);
+            textParts.push(`🔗 [Link] ${d.originalFileName || d.fileName || 'Drive Link'}`);
           } else if (d.mimeType === 'application/pdf' || d.originalFileName?.endsWith('.pdf')) {
-            textParts.push(`📄 [PDF] ${d.originalFileName || d.fileName || 'Audit Document'}`);
+            textParts.push(`📄 [PDF] ${d.originalFileName || d.fileName || 'Document'}`);
           } else if (!photoDocs.includes(d)) {
             textParts.push(`📎 ${d.originalFileName || d.fileName || 'Proof'}`);
           }
@@ -300,7 +321,6 @@ export class ExcelService {
           textParts.push(`Notes: ${remarks.join('; ')}`);
         }
 
-        // If photos are present, add a textual label in cell F
         if (photoDocs.length > 0) {
           textParts.unshift(`📷 ${photoDocs.length} Photo${photoDocs.length > 1 ? 's' : ''} Attached:`);
         }
@@ -318,11 +338,24 @@ export class ExcelService {
 
         const rowIndex = dataRow.number;
 
+        // If the proof has a real web or Drive hyperlink, make the cell a native clickable hyperlink!
+        if (hyperlinkDoc) {
+          const targetUrl = hyperlinkDoc.hyperlink || hyperlinkDoc.fileUrl;
+          if (targetUrl && targetUrl !== '#') {
+            dataRow.getCell(6).value = {
+              text: proofCellText,
+              hyperlink: targetUrl,
+              tooltip: 'Click to open full document / photo in your web browser',
+            };
+            dataRow.getCell(6).font = { name: 'Arial', size: 9, color: { argb: 'FF1D4ED8' }, underline: true };
+          }
+        }
+
         // Set row height based on whether photos are embedded
         if (photoDocs.length > 0) {
-          dataRow.height = 68; // Sufficient height for in-cell thumbnails
+          dataRow.height = 76; // Expanded height for clear in-cell photo thumbnails
         } else if (textParts.length > 2) {
-          dataRow.height = 42;
+          dataRow.height = 44;
         } else {
           dataRow.height = 25;
         }
@@ -335,12 +368,12 @@ export class ExcelService {
         dataRow.getCell(6).alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
 
         dataRow.eachCell((cell) => {
-          cell.font = { name: 'Arial', size: 9.5 };
+          if (!cell.font) cell.font = { name: 'Arial', size: 9.5 };
           cell.border = borderStyle;
         });
 
         // ==========================================
-        // STRATEGY 1: EMBED PHOTO THUMBNAILS IN CELL F
+        // STRATEGY 1: EMBED IN-CELL PHOTO THUMBNAILS
         // ==========================================
         if (photoDocs.length > 0) {
           photoDocs.forEach((pDoc: any, pIdx: number) => {
@@ -356,11 +389,10 @@ export class ExcelService {
                   extension: ext,
                 });
 
-                // Place thumbnails side by side in Column F (0-indexed col 5)
-                // Offset vertically below the label line
+                // Place thumbnails side-by-side inside Column F (0-indexed col 5)
                 sheet.addImage(imageId, {
-                  tl: { col: 5.08 + (pIdx * 0.85), row: rowIndex - 0.72 },
-                  ext: { width: 56, height: 42 },
+                  tl: { col: 5.08 + pIdx * 1.15, row: rowIndex - 0.78 },
+                  ext: { width: 72, height: 50 },
                   editAs: 'oneCell',
                 });
               }
@@ -372,10 +404,115 @@ export class ExcelService {
       }
     }
 
-    // Write workbook buffer and trigger download
+    // ==========================================
+    // 3. DEDICATED HIGH-RESOLUTION "VISUAL EVIDENCE" GALLERY SHEET
+    // ==========================================
+    if (allPhotoProofs.length > 0) {
+      const visualSheet = workbook.addWorksheet('Visual Evidence', {
+        views: [{ showGridLines: true }],
+      });
+
+      visualSheet.columns = [
+        { width: 4 },
+        { width: 14 },
+        { width: 36 },
+        { width: 30 },
+        { width: 42 },
+      ];
+
+      visualSheet.addRow([]);
+      const vTitle = visualSheet.addRow(['', 'AUDIT EVIDENCE: PHOTO REPOSITORY', '', '', '']);
+      vTitle.getCell(2).font = titleFont;
+
+      const vSub = visualSheet.addRow(['', 'High-Resolution Geotagged Visual Evidence for Attribute 3', '', '', '']);
+      vSub.getCell(2).font = subtitleFont;
+      visualSheet.addRow([]);
+
+      const vHeader = visualSheet.addRow(['', 'Indicator', 'Facility / Resource', 'Photo Details', 'Embedded High-Resolution Photo']);
+      vHeader.getCell(2).fill = headerFill;
+      vHeader.getCell(2).font = headerFont;
+      vHeader.getCell(3).fill = headerFill;
+      vHeader.getCell(3).font = headerFont;
+      vHeader.getCell(4).fill = headerFill;
+      vHeader.getCell(4).font = headerFont;
+      vHeader.getCell(5).fill = headerFill;
+      vHeader.getCell(5).font = headerFont;
+
+      allPhotoProofs.forEach((item, idx) => {
+        const rawData = item.doc.dataUrl || item.doc.fileUrl;
+        const fileName = item.doc.originalFileName || item.doc.fileName || `Photo_${idx + 1}.png`;
+        const sizeStr = item.doc.fileSize > 0 ? `${(item.doc.fileSize / 1024).toFixed(1)} KB` : 'Attached Image';
+
+        const row = visualSheet.addRow([
+          '',
+          item.fieldCode,
+          item.fieldLabel,
+          `File: ${fileName}\nSize: ${sizeStr}\nUploaded: ${new Date(item.doc.uploadedAt || Date.now()).toLocaleDateString()}`,
+          '',
+        ]);
+
+        row.height = 140; // High-resolution photo card height
+
+        row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
+        row.getCell(2).font = { name: 'Arial', size: 10, bold: true };
+        row.getCell(3).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        row.getCell(4).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        row.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
+
+        row.getCell(2).border = borderStyle;
+        row.getCell(3).border = borderStyle;
+        row.getCell(4).border = borderStyle;
+        row.getCell(5).border = borderStyle;
+
+        if (rawData && rawData.includes('base64,')) {
+          try {
+            const base64Data = rawData.split('base64,')[1];
+            const isPng = item.doc.mimeType === 'image/png' || fileName.endsWith('.png');
+            const ext = isPng ? 'png' : 'jpeg';
+
+            const imgId = workbook.addImage({
+              base64: base64Data,
+              extension: ext,
+            });
+
+            visualSheet.addImage(imgId, {
+              tl: { col: 4.15, row: row.number - 0.92 },
+              ext: { width: 190, height: 130 },
+              editAs: 'oneCell',
+            });
+          } catch (e) {
+            console.warn('High-res gallery image error:', e);
+          }
+        }
+      });
+    }
+
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
     const cleanDept = (department || 'Institutional').replace(/[^a-zA-Z0-9_-]/g, '_');
-    saveAs(blob, `Attribute_3_${cleanDept}_Report.xlsx`);
+    const fileName = `Attribute_3_${cleanDept}_Report.xlsx`;
+
+    return { blob, buffer, fileName };
+  }
+
+  /**
+   * Generates and triggers direct browser download of the workbook
+   */
+  static async generateAndDownloadAttribute3Workbook(
+    submissionData: any,
+    userName: string,
+    department: string,
+    documents: any[] = []
+  ) {
+    const { blob, fileName } = await this.generateAttribute3WorkbookBlob(
+      submissionData,
+      userName,
+      department,
+      documents
+    );
+    saveAs(blob, fileName);
+    return { blob, fileName };
   }
 }

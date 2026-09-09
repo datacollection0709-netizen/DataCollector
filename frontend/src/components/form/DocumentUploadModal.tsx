@@ -402,8 +402,17 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     key={doc.id || idx}
                     className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs hover:border-brand-300 transition-all flex flex-col justify-between"
                   >
-                    {/* Visual Preview / Icon */}
-                    <div className="relative mb-2 w-full h-24 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center border border-slate-100">
+                    {/* Visual Preview / Icon with click-to-view */}
+                    <div
+                      onClick={() => {
+                        const target = doc.hyperlink || doc.dataUrl || doc.fileUrl;
+                        if (target && target !== '#') {
+                          window.open(target, '_blank');
+                        }
+                      }}
+                      className="relative mb-2 w-full h-24 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center border border-slate-100 cursor-pointer group hover:opacity-90 transition-opacity"
+                      title="Click to open full view"
+                    >
                       {isImg && (doc.dataUrl || doc.fileUrl) ? (
                         <img
                           src={doc.dataUrl || doc.fileUrl}
@@ -428,6 +437,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                       <span className="absolute top-1 left-1 bg-slate-900/75 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
                         #{idx + 1}
                       </span>
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-semibold gap-1">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Open View</span>
+                      </div>
                     </div>
 
                     {/* Metadata */}
@@ -436,18 +449,20 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                         {doc.originalFileName}
                       </p>
                       <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
-                        <span>{doc.fileSize > 0 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : 'Hyperlink'}</span>
-                        {isLink && (
-                          <a
-                            href={doc.hyperlink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand-600 hover:underline flex items-center gap-0.5"
-                          >
-                            <span>Open</span>
-                            <ExternalLink className="w-2.5 h-2.5" />
-                          </a>
-                        )}
+                        <span>{doc.fileSize > 0 ? `${(doc.fileSize / 1024).toFixed(1)} KB` : 'Cloud Link'}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = doc.hyperlink || doc.dataUrl || doc.fileUrl;
+                            if (target && target !== '#') {
+                              window.open(target, '_blank');
+                            }
+                          }}
+                          className="text-brand-600 hover:underline flex items-center gap-0.5 font-medium"
+                        >
+                          <span>Open</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </button>
                       </div>
                     </div>
 
