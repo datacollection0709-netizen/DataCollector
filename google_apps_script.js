@@ -28,7 +28,13 @@ function doPost(e) {
     var payload = JSON.parse(e.postData.contents);
     var action = payload.action;
 
-    if (action === 'uploadFile') {
+    if (action === 'ping') {
+      return jsonResponse({
+        success: true,
+        message: "Google Drive connection active for " + ADMIN_EMAIL,
+        email: ADMIN_EMAIL
+      });
+    } else if (action === 'uploadFile') {
       return handleFileUpload(payload);
     } else if (action === 'submitForm') {
       return handleFormSubmit(payload);

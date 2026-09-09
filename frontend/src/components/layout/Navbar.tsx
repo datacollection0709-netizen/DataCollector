@@ -89,6 +89,23 @@ export const Navbar: React.FC<NavbarProps> = ({ submissionId, onExportExcel, onT
               <span>{isOnline ? 'Online' : 'Offline (Saved Locally)'}</span>
             </div>
 
+            {/* Google Drive Status Badge */}
+            <div
+              className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border ${
+                api.isGoogleDriveConnected()
+                  ? 'bg-blue-950/60 text-blue-300 border-blue-800/50'
+                  : 'bg-amber-950/60 text-amber-300 border-amber-800/50'
+              }`}
+              title={
+                api.isGoogleDriveConnected()
+                  ? 'Google Drive Active: datacollection0709@gmail.com'
+                  : 'Google Drive Setup Required: Open any proof upload dialog to connect'
+              }
+            >
+              <span className={`w-2 h-2 rounded-full ${api.isGoogleDriveConnected() ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
+              <span>{api.isGoogleDriveConnected() ? 'Drive Active' : 'Drive Setup Required'}</span>
+            </div>
+
             {/* Quick Export Excel */}
             {submissionId && (
               <button

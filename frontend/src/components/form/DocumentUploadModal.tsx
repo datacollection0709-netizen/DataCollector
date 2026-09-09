@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   X,
   Info,
@@ -11,8 +11,14 @@ import {
   AlertCircle,
   Plus,
   Clock,
+  Settings,
+  Copy,
+  Check,
+  ShieldAlert,
+  Sparkles,
 } from 'lucide-react';
 import { api } from '../../api/client';
+import { GOOGLE_APPS_SCRIPT_CODE, DEPLOYMENT_STEPS } from '../../utils/googleAppsScriptTemplate';
 
 interface DocumentInfo {
   id: string;
@@ -55,7 +61,7 @@ const GoogleDriveLogo = () => (
 
 // Green-to-Blue Gradient Cloud Illustration with Upward Arrow
 const GoogleCloudUploadIllustration = () => (
-  <svg width="150" height="98" viewBox="0 0 150 98" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-3">
+  <svg width="140" height="90" viewBox="0 0 150 98" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-3">
     <defs>
       <linearGradient id="cloudGreenBlue" x1="10%" y1="60%" x2="90%" y2="40%">
         <stop offset="0%" stopColor="#4ADE80" />
@@ -99,11 +105,80 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [driveLinkLabel, setDriveLinkLabel] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Google Drive Connection State
+  const [isDriveConnected, setIsDriveConnected] = useState<boolean>(false);
+  const [showDriveSetup, setShowDriveSetup] = useState<boolean>(false);
+  const [scriptUrlInput, setScriptUrlInput] = useState<string>('');
+  const [isTestingConnection, setIsTestingConnection] = useState<boolean>(false);
+  const [copiedCode, setCopiedCode] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const connected = api.isGoogleDriveConnected();
+      setIsDriveConnected(connected);
+      setShowDriveSetup(!connected);
+      setScriptUrlInput(api.getGoogleScriptUrl());
+      setErrorMsg(null);
+      setSuccessMsg(null);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   // Filter docs attached to this field
   const fieldDocs = documents.filter((d) => (d.fieldCode || (d as any).field?.code) === fieldCode);
   const isLimitReached = fieldDocs.length >= MAX_PROOFS_PER_FIELD;
+
+  // Copy Google Apps Script code to clipboard
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_CODE);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2500);
+    } catch (err) {
+      setErrorMsg('Failed to copy to clipboard. Please copy from google_apps_script.js in project root.');
+    }
+  };
+
+  // Test and connect Google Apps Script Web App URL
+  const handleConnectDrive = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!scriptUrlInput.trim()) {
+      setErrorMsg('Please paste your Google Apps Script Web App URL.');
+      return;
+    }
+
+    setIsTestingConnection(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const res = await api.testGoogleDriveConnection(scriptUrlInput.trim());
+      if (res.success) {
+        api.setGoogleScriptUrl(scriptUrlInput.trim());
+        setIsDriveConnected(true);
+        setShowDriveSetup(false);
+        setSuccessMsg(res.message || 'Connected to Google Drive (datacollection0709@gmail.com)!');
+      } else {
+        setErrorMsg(res.message || 'Connection test failed. Please verify the URL and deployment settings.');
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to connect to Google Drive.');
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
+  // Disconnect Google Drive
+  const handleDisconnectDrive = () => {
+    if (confirm('Disconnect Google Drive? Uploaded files will require reconnecting.')) {
+      api.setGoogleScriptUrl('');
+      setIsDriveConnected(false);
+      setShowDriveSetup(true);
+      setScriptUrlInput('');
+      setSuccessMsg('Google Drive disconnected.');
+    }
+  };
 
   // Handle direct file upload via Browse button
   const handleFiles = async (files: FileList | null) => {
@@ -128,6 +203,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       return;
     }
 
+    // Check if Google Drive is connected
+    if (!api.isGoogleDriveConnected()) {
+      setShowDriveSetup(true);
+      setErrorMsg('Google Drive connection required: To upload files directly to Google Drive (datacollection0709@gmail.com) like Google Forms, please connect your Google Apps Script Web App below.');
+      return;
+    }
+
     setErrorMsg(null);
     setSuccessMsg(null);
     setIsUploading(true);
@@ -149,14 +231,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       }
       formData.append('dataUrl', dataUrl);
 
-      await api.uploadDocument(formData);
-      setSuccessMsg(`"${file.name}" uploaded to My Drive and linked!`);
+      const res = await api.uploadDocument(formData);
+      setSuccessMsg(`"${file.name}" uploaded directly to Google Drive folder "Attribute 3 Submitted Proofs" and linked!`);
       onDocumentChange();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to upload document.');
+      setErrorMsg(err.message || 'Failed to upload document to Google Drive.');
     } finally {
       setIsUploading(false);
     }
@@ -256,21 +338,153 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         >
           {/* Top Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-3">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-3">
               <GoogleDriveLogo />
-              <h2 className="text-[17px] font-medium text-slate-800 tracking-tight">
-                Insert file
-              </h2>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-[17px] font-semibold text-slate-800 tracking-tight">
+                    Insert file
+                  </h2>
+                  {isDriveConnected ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Drive Connected
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                      <ShieldAlert className="w-3 h-3 text-amber-600" />
+                      Drive Setup Required
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500 truncate max-w-sm">
+                  {fieldCode} • {fieldLabel}
+                </p>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-full text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-              title="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowDriveSetup(!showDriveSetup)}
+                className={`p-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors ${
+                  showDriveSetup
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                }`}
+                title="Google Drive Settings"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Drive Config</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
+
+          {/* GOOGLE DRIVE SETUP CARD (Displays when not connected or toggled) */}
+          {showDriveSetup && (
+            <div className="mx-6 mb-3 p-4 bg-gradient-to-br from-blue-50/90 via-slate-50 to-indigo-50/70 rounded-2xl border border-blue-200/90 shadow-xs">
+              <div className="flex items-start justify-between gap-3 mb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-[#1a73e8] text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+                    <GoogleDriveLogo />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>Connect Google Drive (datacollection0709@gmail.com)</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-600">
+                      Just like Google Forms, files are created directly inside your Google Drive account.
+                    </p>
+                  </div>
+                </div>
+
+                {isDriveConnected && (
+                  <button
+                    type="button"
+                    onClick={handleDisconnectDrive}
+                    className="text-[11px] text-rose-600 hover:underline font-medium flex-shrink-0"
+                  >
+                    Disconnect
+                  </button>
+                )}
+              </div>
+
+              {/* 4 Steps */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 my-3 text-[11px]">
+                {DEPLOYMENT_STEPS.map((s) => (
+                  <div key={s.step} className="p-2.5 bg-white/80 rounded-xl border border-blue-100 flex items-start gap-2">
+                    <span className="w-4 h-4 rounded-full bg-[#1a73e8] text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                      {s.step}
+                    </span>
+                    <div>
+                      <p className="font-semibold text-slate-800">{s.title}</p>
+                      <p className="text-slate-500 text-[10px] leading-snug mt-0.5">{s.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-300 shadow-2xs transition-colors"
+                >
+                  {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                  <span>{copiedCode ? 'Copied Code!' : 'Copy Apps Script Code'}</span>
+                </button>
+
+                <a
+                  href="https://script.google.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-50 text-blue-700 text-xs font-semibold border border-blue-200 shadow-2xs transition-colors"
+                >
+                  <span>Open script.google.com</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              {/* URL Input & Connect Form */}
+              <form onSubmit={handleConnectDrive} className="flex flex-col sm:flex-row items-center gap-2">
+                <input
+                  type="url"
+                  required
+                  placeholder="https://script.google.com/macros/s/.../exec"
+                  value={scriptUrlInput}
+                  onChange={(e) => setScriptUrlInput(e.target.value)}
+                  className="w-full text-xs p-2 rounded-lg border border-slate-300 focus:border-[#1a73e8] focus:ring-1 focus:ring-[#1a73e8] outline-none bg-white font-mono"
+                />
+                <button
+                  type="submit"
+                  disabled={isTestingConnection}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-medium shadow-xs transition-all disabled:opacity-50 flex-shrink-0"
+                >
+                  {isTestingConnection ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Testing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Connect & Test</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          )}
 
           {/* Navigation Tabs: Upload | My Drive | Recent */}
           <div className="flex items-center gap-8 px-6 border-b border-slate-200 text-sm">
@@ -326,7 +540,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             {errorMsg && (
               <div className="flex items-start gap-2.5 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>{errorMsg}</span>
+                <div className="flex-1">
+                  <span>{errorMsg}</span>
+                  {!isDriveConnected && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDriveSetup(true)}
+                      className="block mt-1 font-bold text-rose-900 underline"
+                    >
+                      Open Google Drive Setup
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -338,12 +563,12 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             )}
 
             {/* Google Drive Information Callout */}
-            <div className="flex items-start gap-3 p-3.5 bg-[#f0f4f9] rounded-xl text-slate-700 text-xs leading-relaxed border border-slate-200/50">
-              <div className="w-5 h-5 rounded-full border border-slate-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Info className="w-3.5 h-3.5 text-slate-600" />
+            <div className="flex items-start gap-3 p-3 bg-[#f0f4f9] rounded-xl text-slate-700 text-xs leading-relaxed border border-slate-200/50">
+              <div className="w-4 h-4 rounded-full border border-slate-400 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Info className="w-3 h-3 text-slate-600" />
               </div>
               <p>
-                Upload 1 supported file. Max 10 MB. A copy of the selected file will be sent. Once submitted, files cannot be edited or removed.
+                Files upload directly into Google Drive folder <strong className="font-semibold text-slate-900">Attribute 3 Submitted Proofs</strong>. Max 10 MB per file.
               </p>
             </div>
 
@@ -363,7 +588,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   onDragLeave={handleDrag}
                   onDragOver={handleDrag}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-2xl py-12 px-6 flex flex-col items-center justify-center text-center transition-all ${
+                  className={`border-2 border-dashed rounded-2xl py-10 px-6 flex flex-col items-center justify-center text-center transition-all ${
                     dragActive
                       ? 'border-[#1a73e8] bg-blue-50/40'
                       : 'border-slate-300 hover:border-slate-400 bg-white'
@@ -374,7 +599,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   <button
                     type="button"
                     disabled={isUploading || isLimitReached}
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => {
+                      if (!isDriveConnected) {
+                        setShowDriveSetup(true);
+                        setErrorMsg('Please connect your Google Apps Script Web App URL first to enable live uploads.');
+                      } else {
+                        fileInputRef.current?.click();
+                      }
+                    }}
                     className="inline-flex items-center justify-center rounded-full bg-[#1a73e8] hover:bg-[#1557b0] text-white px-8 py-2.5 text-sm font-medium shadow-xs transition-all disabled:opacity-50"
                   >
                     {isUploading ? (
@@ -388,7 +620,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   </button>
 
                   <p className="text-xs text-slate-600 mt-4">
-                    or drag a file to upload to <strong className="text-slate-800 font-semibold">My Drive</strong> and select
+                    or drag a file to upload directly to <strong className="text-slate-800 font-semibold">My Drive</strong> and select
                   </p>
                 </div>
               </div>
@@ -404,7 +636,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                       <span>Google Drive (datacollection0709@gmail.com)</span>
                     </h4>
                     <p className="text-[11px] text-blue-800/80 mt-0.5">
-                      Open your drive to upload or select files, then paste the file link below.
+                      Already have the file in your Google Drive? Open Drive, copy its link, and paste below.
                     </p>
                   </div>
                   <a
@@ -426,7 +658,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     <input
                       type="text"
                       required
-                      placeholder="https://drive.google.com/file/d/..."
+                      placeholder="https://drive.google.com/file/d/.../view"
                       value={driveLinkInput}
                       onChange={(e) => setDriveLinkInput(e.target.value)}
                       className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:border-[#1a73e8] outline-none bg-white font-mono"
@@ -439,7 +671,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Geotagged Classroom Photo"
+                      placeholder="e.g. Smart Classroom Geotagged Proof"
                       value={driveLinkLabel}
                       onChange={(e) => setDriveLinkLabel(e.target.value)}
                       className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:border-[#1a73e8] outline-none bg-white"
@@ -485,7 +717,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:underline text-[11px] font-medium flex items-center gap-0.5 flex-shrink-0"
                           >
-                            <span>View</span>
+                            <span>View in Drive</span>
                             <ExternalLink className="w-3 h-3" />
                           </a>
                         )}

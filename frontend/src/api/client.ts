@@ -574,6 +574,97 @@ class LocalApiClient {
     };
   }
 
+  // Google Drive Connection Methods
+  getGoogleScriptUrl(): string {
+    return (
+      localStorage.getItem('GOOGLE_SCRIPT_URL') ||
+      (import.meta as any).env?.VITE_GOOGLE_SCRIPT_URL ||
+      ''
+    ).trim();
+  }
+
+  setGoogleScriptUrl(url: string): void {
+    if (!url || !url.trim()) {
+      localStorage.removeItem('GOOGLE_SCRIPT_URL');
+    } else {
+      localStorage.setItem('GOOGLE_SCRIPT_URL', url.trim());
+    }
+  }
+
+  isGoogleDriveConnected(): boolean {
+    const url = this.getGoogleScriptUrl();
+    return Boolean(url && url.startsWith('http'));
+  }
+
+  async testGoogleDriveConnection(customUrl?: string): Promise<{ success: boolean; message: string; email?: string }> {
+    const scriptUrl = (customUrl || this.getGoogleScriptUrl()).trim();
+    if (!scriptUrl) {
+      return {
+        success: false,
+        message: 'No Google Apps Script Web App URL provided.',
+      };
+    }
+
+    if (!/^https?:\/\/script\.google\.com\/macros\/s\/.+\/exec/i.test(scriptUrl)) {
+      return {
+        success: false,
+        message: 'Invalid URL. Must be an official Web App URL ending with /exec (e.g. https://script.google.com/macros/s/AKfycb.../exec)',
+      };
+    }
+
+    // Test 1: POST action: 'ping' with text/plain (avoids CORS preflight)
+    try {
+      const res = await fetch(scriptUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'ping' }),
+      });
+      const data = await res.json();
+      if (data && (data.success || data.message)) {
+        return {
+          success: true,
+          message: data.message || 'Connected to Google Drive!',
+          email: data.email || 'datacollection0709@gmail.com',
+        };
+      }
+    } catch (e1) {
+      // Test 2: GET request (fallback if browser redirects or blocks POST)
+      try {
+        const getRes = await fetch(scriptUrl);
+        const getData = await getRes.json();
+        if (getData && (getData.success || getData.message)) {
+          return {
+            success: true,
+            message: getData.message || 'Google Apps Script is active!',
+            email: 'datacollection0709@gmail.com',
+          };
+        }
+      } catch (e2) {
+        // Test 3: Proxy through /api/upload
+        try {
+          const proxyRes = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ googleScriptUrl: scriptUrl, action: 'ping' }),
+          });
+          const proxyData = await proxyRes.json();
+          if (proxyData?.success || proxyData?.message) {
+            return {
+              success: true,
+              message: proxyData.message || 'Connected via proxy to Google Apps Script!',
+              email: proxyData.email || 'datacollection0709@gmail.com',
+            };
+          }
+        } catch (e3) {}
+      }
+    }
+
+    return {
+      success: false,
+      message: 'Could not reach Google Apps Script. Please make sure the Web App was deployed with "Execute as: Me" and "Who has access: Anyone".',
+    };
+  }
+
   // Documents
   async uploadDocument(formData: FormData) {
     const file = formData.get('file') as File | null;
@@ -584,9 +675,9 @@ class LocalApiClient {
 
     if (!file || !submissionId) throw new Error('Missing file or submissionId');
 
-    // 2 MB limit check
-    if (file.size > 2 * 1024 * 1024) {
-      throw new Error(`File exceeds 2 MB limit (${(file.size / (1024 * 1024)).toFixed(2)} MB).`);
+    // 10 MB limit check matching Google Drive
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error(`File exceeds 10 MB limit (${(file.size / (1024 * 1024)).toFixed(2)} MB).`);
     }
 
     const subs = this.getSubmissionsData();
@@ -605,7 +696,15 @@ class LocalApiClient {
       throw new Error('Maximum 3 photos/proofs allowed per indicator.');
     }
 
-    const fileId = `proof-${Date.now()}`;
+    // Check Google Drive backend connection
+    const googleScriptUrl = this.getGoogleScriptUrl();
+    if (!googleScriptUrl) {
+      throw new Error(
+        'Google Drive connection required: To upload files directly into Google Drive (datacollection0709@gmail.com) like Google Forms, please connect your Google Apps Script Web App in the setup box.'
+      );
+    }
+
+    const user = this.getLocalUser();
 
     // Read base64 dataUrl if not provided
     let dataUrl = clientDataUrl;
@@ -618,44 +717,73 @@ class LocalApiClient {
       });
     }
 
-    // Upload to official Google Drive via Google Apps Script (DriveApp.createFile) - NO THIRD-PARTY BOTS!
+    const base64Data = dataUrl.includes('base64,') ? dataUrl.split('base64,')[1] : '';
+
+    // Upload to official Google Drive via Google Apps Script (DriveApp.createFile) - GENUINE DRIVE STORAGE!
     let cloudUrl = '';
+    let driveFileId = '';
+    let uploadError = '';
 
-    const googleScriptUrl =
-      localStorage.getItem('GOOGLE_SCRIPT_URL') ||
-      (import.meta as any).env?.VITE_GOOGLE_SCRIPT_URL;
-
-    if (googleScriptUrl) {
+    // Attempt 1: Direct fetch to Google Apps Script
+    try {
+      const gRes = await fetch(googleScriptUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+        body: JSON.stringify({
+          action: 'uploadFile',
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          base64Data,
+          userName: user?.name || 'Institutional Officer',
+          department: user?.organizationName || 'Attribute 3',
+        }),
+      });
+      const gJson = await gRes.json();
+      if (gJson?.fileUrl) {
+        cloudUrl = gJson.fileUrl;
+        driveFileId = gJson.fileId || `drive-${Date.now()}`;
+      } else if (gJson?.error) {
+        uploadError = gJson.error;
+      }
+    } catch (e: any) {
+      // Attempt 2: Serverless proxy /api/upload
       try {
-        const gRes = await fetch(googleScriptUrl, {
+        const proxyRes = await fetch('/api/upload', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            googleScriptUrl,
             action: 'uploadFile',
             fileName: file.name,
-            mimeType: file.type,
-            base64Data: dataUrl.includes('base64,') ? dataUrl.split('base64,')[1] : '',
-            userName: 'Institutional Officer',
-            department: 'Attribute 3',
+            mimeType: file.type || 'application/octet-stream',
+            base64Data,
+            userName: user?.name || 'Institutional Officer',
+            department: user?.organizationName || 'Attribute 3',
           }),
         });
-        const gJson = await gRes.json();
-        if (gJson?.fileUrl) {
-          cloudUrl = gJson.fileUrl;
+        const proxyJson = await proxyRes.json();
+        if (proxyJson?.fileUrl) {
+          cloudUrl = proxyJson.fileUrl;
+          driveFileId = proxyJson.fileId || `drive-${Date.now()}`;
+        } else if (proxyJson?.error) {
+          uploadError = proxyJson.error;
         }
-      } catch (e) {
-        console.warn('Official Google Drive upload failed:', e);
+      } catch (proxyErr: any) {
+        uploadError = e?.message || proxyErr?.message || 'Network error connecting to Google Apps Script';
       }
     }
 
     if (!cloudUrl) {
-      // Official Google Drive search link for this uploaded document
-      cloudUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(file.name)}`;
+      throw new Error(
+        `Failed to upload to Google Drive: ${uploadError || 'Script returned no file URL'}. Please verify that your Google Apps Script is deployed with "Who has access: Anyone".`
+      );
     }
 
-    // Save to IndexedDB (proofStorage)
+    const fileId = driveFileId || `proof-${Date.now()}`;
+
+    // Save to IndexedDB (proofStorage) for caching
     const storedProof: StoredProof = {
       id: fileId,
       fieldCode,
@@ -686,7 +814,7 @@ class LocalApiClient {
     subs[submissionId].documents.push(doc);
     this.saveSubmissionsData(subs);
 
-    return { success: true, message: 'File uploaded and stored', document: doc };
+    return { success: true, message: 'File uploaded directly to Google Drive!', document: doc };
   }
 
   // Strategy 3: Hyperlink proof
