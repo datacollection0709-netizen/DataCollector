@@ -579,7 +579,7 @@ class LocalApiClient {
     return (
       localStorage.getItem('GOOGLE_SCRIPT_URL') ||
       (import.meta as any).env?.VITE_GOOGLE_SCRIPT_URL ||
-      ''
+      'https://script.google.com/macros/s/AKfycbwPPjyGSXSguHLXASQikEL6KMCfHQE-huVsn2icQ1cNExLt5bpD6bfmbwh44V10vCo5/exec'
     ).trim();
   }
 
