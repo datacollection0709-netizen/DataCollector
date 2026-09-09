@@ -169,7 +169,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
             ) : (
               <>
                 <Upload className="w-3.5 h-3.5 text-slate-500" />
-                <span>Add Proof (Drive)</span>
+                <span>Upload File</span>
               </>
             )}
           </button>

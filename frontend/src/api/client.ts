@@ -653,7 +653,7 @@ class LocalApiClient {
         if (tmpRes.ok) {
           const tmpJson = await tmpRes.json();
           if (tmpJson?.data?.url) {
-            cloudUrl = tmpJson.data.url;
+            cloudUrl = tmpJson.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
           }
         }
       } catch (e) {
