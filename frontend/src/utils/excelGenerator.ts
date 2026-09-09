@@ -69,7 +69,7 @@ export class ExcelService {
       ? Object.values(documents)
       : [];
 
-    const allPhotoProofs: { fieldCode: string; fieldLabel: string; doc: any }[] = [];
+    const allDriveProofs: { fieldCode: string; fieldLabel: string; doc: any }[] = [];
 
     for (const doc of docList) {
       if (!doc) continue;
@@ -79,23 +79,15 @@ export class ExcelService {
         list.push(doc);
         docMap.set(fCode, list);
 
-        const isPhoto =
-          doc.mimeType?.startsWith('image/') ||
-          doc.dataUrl?.startsWith('data:image/') ||
-          /\.(jpg|jpeg|png|webp)$/i.test(doc.originalFileName || doc.fileName || '');
-
-        if (isPhoto && (doc.dataUrl || doc.fileUrl)) {
-          // Find field label
-          let fLabel = fCode;
-          for (const s of sections) {
-            const found = s.fields.find((f: any) => f.code === fCode);
-            if (found) {
-              fLabel = found.label;
-              break;
-            }
+        let fLabel = fCode;
+        for (const s of sections) {
+          const found = s.fields.find((f: any) => f.code === fCode);
+          if (found) {
+            fLabel = found.label;
+            break;
           }
-          allPhotoProofs.push({ fieldCode: fCode, fieldLabel: fLabel, doc });
         }
+        allDriveProofs.push({ fieldCode: fCode, fieldLabel: fLabel, doc });
       }
     }
 
@@ -232,7 +224,7 @@ export class ExcelService {
     summarySheet.addRow([]);
 
     // ==========================================
-    // 2. SECTIONS 3.1 to 3.5 INDIVIDUAL SHEETS (TWO-COLUMN PROOFS & LINKS)
+    // 2. SECTIONS 3.1 to 3.5 INDIVIDUAL SHEETS (CLEAN HYPERLINKS, ZERO EMBEDDED IMAGES)
     // ==========================================
     for (const sec of sections) {
       const sheet = workbook.addWorksheet(sec.code, {
@@ -245,8 +237,7 @@ export class ExcelService {
         { key: 'y1', width: 18 },
         { key: 'y2', width: 18 },
         { key: 'y3', width: 18 },
-        { key: 'thumb', width: 22 }, // Dedicated Column F for in-cell photo thumbnail!
-        { key: 'link', width: 44 },  // Dedicated Column G for 100% clickable link!
+        { key: 'driveLink', width: 50 }, // Clean Column F for 100% clickable Google Drive link!
       ];
 
       const headerRow = sheet.addRow([
@@ -255,8 +246,7 @@ export class ExcelService {
         '2023-24',
         '2024-25',
         '2025-26',
-        'Photo Thumbnail',
-        'Clickable Proof Link (Google Drive / Web)',
+        'Verification Document (Google Drive Link)',
       ]);
       headerRow.height = 28;
 
@@ -267,6 +257,7 @@ export class ExcelService {
         cell.border = borderStyle;
       });
       headerRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' };
+      headerRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'left' };
 
       for (let fIdx = 0; fIdx < sec.fields.length; fIdx++) {
         const field = sec.fields[fIdx];
@@ -341,26 +332,17 @@ export class ExcelService {
         // Attached docs for this field
         const docs = docMap.get(field.code) || [];
 
-        // Identify photos for in-cell embedding (up to 3 photos)
-        const photoDocs = docs.filter((d: any) => {
-          const isImgMime = d.mimeType?.startsWith('image/');
-          const isImgData = d.dataUrl?.startsWith('data:image/');
-          const isImgExt = /\.(jpg|jpeg|png|webp)$/i.test(d.originalFileName || d.fileName || '');
-          return (isImgMime || isImgData || isImgExt) && (d.dataUrl || d.fileUrl);
-        }).slice(0, 3);
-
         // Find primary clickable target URL for this field
-        const primaryDoc = docs.find((d: any) => (d.hyperlink && d.hyperlink !== '#') || (d.fileUrl && d.fileUrl !== '#'));
+        const primaryDoc = docs.find((d: any) => (d.hyperlink && d.hyperlink !== '#') || (d.fileUrl && d.fileUrl !== '#')) || docs[0];
         const primaryUrl = primaryDoc ? (primaryDoc.hyperlink || primaryDoc.fileUrl) : null;
 
         let proofLinkText = '—';
         if (primaryDoc) {
-          const isPhoto = photoDocs.includes(primaryDoc);
           const docName = primaryDoc.originalFileName || primaryDoc.fileName || 'Proof Document';
-          const typePrefix = isPhoto ? '📷 Photo' : primaryDoc.mimeType === 'application/pdf' || docName.toLowerCase().endsWith('.pdf') ? '📄 PDF' : '🔗 Drive Link';
-          proofLinkText = `🔗 [${typePrefix}] Click to Open ${docName}`;
           if (docs.length > 1) {
-            proofLinkText += ` (+${docs.length - 1} more)`;
+            proofLinkText = `🔗 Open in Google Drive: ${docName} (+${docs.length - 1} more)`;
+          } else {
+            proofLinkText = `🔗 Open in Google Drive: ${docName}`;
           }
         }
 
@@ -370,20 +352,31 @@ export class ExcelService {
           val1,
           val2,
           val3,
-          photoDocs.length > 0 ? '' : docs.length > 0 ? '📄 Attached' : '—', // Column F: Photo Thumbnail
-          proofLinkText, // Column G: Clickable Link
+          proofLinkText,
         ]);
 
-        const rowIndex = dataRow.number;
+        dataRow.height = 26; // Clean, standard row height (zero bloated rows)
 
-        // Set native, unobstructed clickable link in Column G
+        dataRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        dataRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+        dataRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
+        dataRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
+        dataRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
+        dataRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+
+        dataRow.eachCell((cell) => {
+          if (!cell.font) cell.font = { name: 'Arial', size: 9.5 };
+          cell.border = borderStyle;
+        });
+
+        // Set native, 100% unobstructed clickable link in Column 6 (Google Drive)
         if (primaryUrl && primaryUrl !== '#') {
-          dataRow.getCell(7).value = {
+          dataRow.getCell(6).value = {
             text: proofLinkText,
             hyperlink: primaryUrl,
-            tooltip: `Click to open in Google Drive / Browser: ${primaryDoc?.originalFileName || 'Proof Document'}`,
+            tooltip: `Click to open ${primaryDoc?.originalFileName || 'file'} in Google Drive`,
           };
-          dataRow.getCell(7).font = {
+          dataRow.getCell(6).font = {
             name: 'Arial',
             size: 9.5,
             color: { argb: 'FF1D4ED8' },
@@ -391,132 +384,69 @@ export class ExcelService {
             bold: true,
           };
         }
-
-        // Set row height based on whether photos are embedded
-        if (photoDocs.length > 0) {
-          dataRow.height = 70; // Expanded height for clear in-cell photo thumbnail
-        } else {
-          dataRow.height = 26;
-        }
-
-        dataRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
-        dataRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-        dataRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'center' };
-        dataRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'center' };
-        dataRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'center' };
-        dataRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
-        dataRow.getCell(7).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-
-        dataRow.eachCell((cell) => {
-          if (!cell.font) cell.font = { name: 'Arial', size: 9.5 };
-          cell.border = borderStyle;
-        });
-
-        // ==========================================
-        // STRATEGY 1: EMBED IN-CELL PHOTO THUMBNAILS IN DEDICATED COLUMN F
-        // ==========================================
-        if (photoDocs.length > 0) {
-          photoDocs.forEach((pDoc: any, pIdx: number) => {
-            try {
-              const rawData = pDoc.dataUrl || pDoc.fileUrl;
-              if (rawData && rawData.includes('base64,')) {
-                const base64Data = rawData.split('base64,')[1];
-                const isPng = pDoc.mimeType === 'image/png' || pDoc.originalFileName?.endsWith('.png');
-                const ext = isPng ? 'png' : 'jpeg';
-
-                const imageId = workbook.addImage({
-                  base64: base64Data,
-                  extension: ext,
-                });
-
-                const photoUrl = pDoc.hyperlink || (pDoc.fileUrl && pDoc.fileUrl !== '#' ? pDoc.fileUrl : primaryUrl);
-
-                // Place thumbnail inside dedicated Column F (0-indexed col 5)
-                // WITH native drawing hyperlink so clicking the photo also opens it!
-                sheet.addImage(imageId, {
-                  tl: { col: 5.12 + pIdx * 0.4, row: rowIndex - 0.85 },
-                  ext: { width: 88, height: 56 },
-                  editAs: 'oneCell',
-                  ...(photoUrl && photoUrl !== '#'
-                    ? {
-                        hyperlinks: {
-                          hyperlink: photoUrl,
-                          tooltip: `Click to open photo (${pDoc.originalFileName || 'image'}) in Google Drive / Browser`,
-                        },
-                      }
-                    : {}),
-                });
-              }
-            } catch (imgErr) {
-              console.warn(`Could not embed photo thumbnail for field ${field.code}:`, imgErr);
-            }
-          });
-        }
       }
     }
 
     // ==========================================
-    // 3. DEDICATED HIGH-RESOLUTION "VISUAL EVIDENCE" GALLERY SHEET
+    // 3. DEDICATED "GOOGLE DRIVE PROOFS" SHEET (CLEAN TABULAR INDEX, ZERO EMBEDDED IMAGES)
     // ==========================================
-    if (allPhotoProofs.length > 0) {
-      const visualSheet = workbook.addWorksheet('Visual Evidence', {
-        views: [{ showGridLines: true }],
+    if (allDriveProofs.length > 0) {
+      const proofsSheet = workbook.addWorksheet('Google Drive Proofs', {
+        views: [{ state: 'frozen', ySplit: 4, showGridLines: true }],
       });
 
-      visualSheet.columns = [
+      proofsSheet.columns = [
         { width: 4 },  // A: spacer
         { width: 14 }, // B: Indicator code
-        { width: 34 }, // C: Facility name
-        { width: 32 }, // D: Photo details
-        { width: 36 }, // E: Dedicated clickable link!
-        { width: 30 }, // F: Large embedded photo!
+        { width: 38 }, // C: Facility name
+        { width: 34 }, // D: Document Name / Title
+        { width: 50 }, // E: Clickable Google Drive link
+        { width: 20 }, // F: Date Attached
       ];
 
-      visualSheet.addRow([]);
-      const vTitle = visualSheet.addRow(['', 'AUDIT EVIDENCE: PHOTO REPOSITORY', '', '', '', '']);
-      vTitle.getCell(2).font = titleFont;
+      proofsSheet.addRow([]);
+      const pTitle = proofsSheet.addRow(['', 'AUDIT PROOFS & VERIFICATION DOCUMENTS', '', '', '', '']);
+      pTitle.getCell(2).font = titleFont;
 
-      const vSub = visualSheet.addRow(['', 'High-Resolution Geotagged Visual Evidence for Attribute 3 (Click any link or photo to open)', '', '', '', '']);
-      vSub.getCell(2).font = subtitleFont;
-      visualSheet.addRow([]);
+      const pSub = proofsSheet.addRow(['', 'Direct Clickable Google Drive Links for Verification (Admin: datacollection0709@gmail.com)', '', '', '', '']);
+      pSub.getCell(2).font = subtitleFont;
+      proofsSheet.addRow([]);
 
-      const vHeader = visualSheet.addRow([
+      const pHeader = proofsSheet.addRow([
         '',
-        'Indicator',
-        'Facility / Resource',
-        'Photo Details',
-        'Clickable Proof Link (Google Drive / Web)',
-        'Embedded Photo Preview (Click to Open)',
+        'Indicator Code',
+        'Facility / Indicator Description',
+        'Document Name / Title',
+        'Google Drive Verification Link',
+        'Date Attached',
       ]);
-      vHeader.getCell(2).fill = headerFill;
-      vHeader.getCell(2).font = headerFont;
-      vHeader.getCell(3).fill = headerFill;
-      vHeader.getCell(3).font = headerFont;
-      vHeader.getCell(4).fill = headerFill;
-      vHeader.getCell(4).font = headerFont;
-      vHeader.getCell(5).fill = headerFill;
-      vHeader.getCell(5).font = headerFont;
-      vHeader.getCell(6).fill = headerFill;
-      vHeader.getCell(6).font = headerFont;
+      pHeader.height = 28;
+      for (let c = 2; c <= 6; c++) {
+        pHeader.getCell(c).fill = headerFill;
+        pHeader.getCell(c).font = headerFont;
+        pHeader.getCell(c).alignment = { vertical: 'middle', horizontal: c === 2 || c === 6 ? 'center' : 'left' };
+        pHeader.getCell(c).border = borderStyle;
+      }
 
-      allPhotoProofs.forEach((item, idx) => {
-        const rawData = item.doc.dataUrl || item.doc.fileUrl;
-        const fileName = item.doc.originalFileName || item.doc.fileName || `Photo_${idx + 1}.png`;
-        const sizeStr = item.doc.fileSize > 0 ? `${(item.doc.fileSize / 1024).toFixed(1)} KB` : 'Attached Image';
-        const photoUrl = item.doc.hyperlink || (item.doc.fileUrl && item.doc.fileUrl !== '#' ? item.doc.fileUrl : null);
+      allDriveProofs.forEach((item, idx) => {
+        const doc = item.doc;
+        const fileName = doc.originalFileName || doc.fileName || `Proof Document ${idx + 1}`;
+        const targetUrl = doc.hyperlink || (doc.fileUrl && doc.fileUrl !== '#' ? doc.fileUrl : 'https://drive.google.com/drive/my-drive');
+        const uploadDate = new Date(doc.uploadedAt || Date.now()).toLocaleDateString('en-IN', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        });
 
-        const detailsText = `File: ${fileName}\nSize: ${sizeStr}\nUploaded: ${new Date(item.doc.uploadedAt || Date.now()).toLocaleDateString()}`;
-
-        const row = visualSheet.addRow([
+        const row = proofsSheet.addRow([
           '',
           item.fieldCode,
           item.fieldLabel,
-          detailsText,
-          photoUrl ? `🔗 Open Full Photo in Google Drive / Browser` : 'Embedded Photo',
-          '', // Column F: Photo placed here
+          fileName,
+          `🔗 Open in Google Drive: ${fileName}`,
+          uploadDate,
         ]);
-
-        row.height = 120; // High-resolution photo card height
+        row.height = 26;
 
         row.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
         row.getCell(2).font = { name: 'Arial', size: 10, bold: true };
@@ -525,50 +455,24 @@ export class ExcelService {
         row.getCell(5).alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
         row.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
 
-        row.getCell(2).border = borderStyle;
-        row.getCell(3).border = borderStyle;
-        row.getCell(4).border = borderStyle;
-        row.getCell(5).border = borderStyle;
-        row.getCell(6).border = borderStyle;
-
-        if (photoUrl && photoUrl !== '#') {
-          // Unobstructed clickable link on Column 5 (Column E)
-          row.getCell(5).value = {
-            text: `🔗 Click to Open Full Photo (${fileName})`,
-            hyperlink: photoUrl,
-            tooltip: `Click to open ${fileName} in Google Drive / Browser`,
-          };
-          row.getCell(5).font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1D4ED8' }, underline: true };
+        for (let c = 2; c <= 6; c++) {
+          row.getCell(c).border = borderStyle;
+          if (!row.getCell(c).font) row.getCell(c).font = { name: 'Arial', size: 9.5 };
         }
 
-        if (rawData && rawData.includes('base64,')) {
-          try {
-            const base64Data = rawData.split('base64,')[1];
-            const isPng = item.doc.mimeType === 'image/png' || fileName.endsWith('.png');
-            const ext = isPng ? 'png' : 'jpeg';
-
-            const imgId = workbook.addImage({
-              base64: base64Data,
-              extension: ext,
-            });
-
-            // Placed inside Column F (0-indexed col 5) so it NEVER covers Column E!
-            visualSheet.addImage(imgId, {
-              tl: { col: 5.12, row: row.number - 0.88 },
-              ext: { width: 175, height: 100 },
-              editAs: 'oneCell',
-              ...(photoUrl && photoUrl !== '#'
-                ? {
-                    hyperlinks: {
-                      hyperlink: photoUrl,
-                      tooltip: `Click to open full photo (${fileName}) in Google Drive / Browser`,
-                    },
-                  }
-                : {}),
-            });
-          } catch (e) {
-            console.warn('High-res gallery image error:', e);
-          }
+        if (targetUrl) {
+          row.getCell(5).value = {
+            text: `🔗 Open in Google Drive: ${fileName}`,
+            hyperlink: targetUrl,
+            tooltip: `Click to open ${fileName} in Google Drive / Web`,
+          };
+          row.getCell(5).font = {
+            name: 'Arial',
+            size: 9.5,
+            bold: true,
+            color: { argb: 'FF1D4ED8' },
+            underline: true,
+          };
         }
       });
     }
