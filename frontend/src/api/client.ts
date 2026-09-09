@@ -706,8 +706,9 @@ class LocalApiClient {
     yearCode?: string;
     fileName: string;
     hyperlink: string;
+    dataUrl?: string;
   }) {
-    const { submissionId, fieldCode, yearCode, fileName, hyperlink } = params;
+    const { submissionId, fieldCode, yearCode, fileName, hyperlink, dataUrl } = params;
     const subs = this.getSubmissionsData();
     if (!subs[submissionId]) {
       subs[submissionId] = { id: submissionId, status: 'DRAFT', values: [], documents: [] };
@@ -732,6 +733,8 @@ class LocalApiClient {
       fileSize: 0,
       mimeType: 'text/uri-list',
       hyperlink,
+      fileUrl: hyperlink,
+      dataUrl: dataUrl || undefined,
       uploadedAt: new Date().toISOString(),
     };
     await proofStorage.saveProof(storedProof);
@@ -746,6 +749,7 @@ class LocalApiClient {
       uploadedAt: new Date().toISOString(),
       hyperlink,
       fileUrl: hyperlink,
+      dataUrl: dataUrl || undefined,
     };
 
     subs[submissionId].documents.push(doc);

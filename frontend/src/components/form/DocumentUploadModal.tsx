@@ -53,7 +53,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   documents,
   onDocumentChange,
 }) => {
-  const [activeTab, setActiveTab] = useState<'upload' | 'link'>('upload');
+  const [activeTab, setActiveTab] = useState<'drive' | 'upload'>('drive');
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -115,7 +115,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       formData.append('dataUrl', dataUrl);
 
       await api.uploadDocument(formData);
-      setSuccessMsg(`"${file.name}" uploaded successfully! Embedded in Excel report & clickable to open full view.`);
+      setSuccessMsg(`"${file.name}" uploaded successfully! Embedded in Excel report & clickable to open.`);
       onDocumentChange();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -127,11 +127,11 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
     }
   };
 
-  // Hyperlink Handler (Strategy 3: Google Drive / Web Link)
+  // Google Drive & Cloud Link Handler (Strategy 3)
   const handleAddHyperlink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hyperlinkInput.trim()) {
-      setErrorMsg('Please enter a valid URL or Google Drive link.');
+      setErrorMsg('Please enter a valid Google Drive or cloud link.');
       return;
     }
 
@@ -148,7 +148,16 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         finalUrl = 'https://' + finalUrl;
       }
 
-      const linkTitle = hyperlinkLabel.trim() || 'Google Drive / Cloud Proof Link';
+      // Auto-detect Google Drive file ID to generate official viewing link & thumbnail
+      const driveMatch = finalUrl.match(/\/d\/([a-zA-Z0-9_-]+)/) || finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
+      let driveThumbnail: string | undefined = undefined;
+      if (driveMatch) {
+        const fileId = driveMatch[1];
+        finalUrl = `https://drive.google.com/file/d/${fileId}/view?usp=sharing`;
+        driveThumbnail = `https://lh3.googleusercontent.com/d/${fileId}`;
+      }
+
+      const linkTitle = hyperlinkLabel.trim() || (driveMatch ? 'Google Drive Proof Document' : 'Cloud Proof Link');
 
       await api.addHyperlinkProof({
         submissionId,
@@ -156,9 +165,10 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         yearCode: yearCode !== 'all' ? yearCode : undefined,
         fileName: linkTitle,
         hyperlink: finalUrl,
+        dataUrl: driveThumbnail,
       });
 
-      setSuccessMsg(`Hyperlink "${linkTitle}" saved! Embedded and clickable in Excel.`);
+      setSuccessMsg(`Google Drive proof "${linkTitle}" saved! It is clickable and openable in Excel.`);
       setHyperlinkInput('');
       setHyperlinkLabel('');
       onDocumentChange();
@@ -205,15 +215,15 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Audit Proofs & Visual Evidence"
-      description={`${fieldCode}: ${fieldLabel} — Maximum 3 proofs (Photos/PDFs up to 2 MB, or Drive Hyperlinks)`}
+      description={`${fieldCode}: ${fieldLabel} — Maximum 3 proofs (Google Drive Links or Photos/PDFs up to 2 MB)`}
       maxWidth="lg"
     >
       <div className="space-y-4">
         {/* Informational Guidance Alert */}
-        <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs">
-          <CheckCircle2 className="w-4 h-4 text-blue-600 flex-shrink-0" />
+        <div className="flex items-center gap-2 p-3 bg-blue-50/80 border border-blue-200 rounded-xl text-blue-900 text-xs">
+          <CheckCircle2 className="w-4.5 h-4.5 text-blue-600 flex-shrink-0" />
           <span>
-            <strong>Clickable In Excel:</strong> All attached photos and documents are embedded with direct links. Clicking the photo or link in your generated Excel report opens the full file in your browser!
+            <strong>100% Openable in Excel:</strong> Upload your photo or PDF to Google Drive and paste the link below. The file link is embedded in Excel and opens immediately in any browser on any device!
           </span>
         </div>
 
@@ -255,6 +265,18 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         <div className="flex border-b border-slate-200">
           <button
             type="button"
+            onClick={() => setActiveTab('drive')}
+            className={`flex items-center gap-1.5 py-2.5 px-4 text-xs font-semibold border-b-2 transition-all ${
+              activeTab === 'drive'
+                ? 'border-brand-600 text-brand-700'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <Link2 className="w-4 h-4" />
+            <span>Google Drive Link (Recommended)</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('upload')}
             className={`flex items-center gap-1.5 py-2.5 px-4 text-xs font-semibold border-b-2 transition-all ${
               activeTab === 'upload'
@@ -263,23 +285,79 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             }`}
           >
             <ImageIcon className="w-4 h-4" />
-            <span>Upload Photo / PDF (Max 2 MB)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('link')}
-            className={`flex items-center gap-1.5 py-2.5 px-4 text-xs font-semibold border-b-2 transition-all ${
-              activeTab === 'link'
-                ? 'border-brand-600 text-brand-700'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Link2 className="w-4 h-4" />
-            <span>Add Hyperlink / Drive URL</span>
+            <span>Direct Photo / PDF Upload</span>
           </button>
         </div>
 
-        {/* TAB 1: FILE UPLOAD DROPZONE */}
+        {/* TAB 1: GOOGLE DRIVE LINK (STRATEGY 3 - PRIMARY) */}
+        {activeTab === 'drive' && (
+          <div className="space-y-4">
+            {/* Quick Open Drive Helper Box */}
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50/60 rounded-xl border border-blue-200/80">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>Google Drive Upload System</span>
+                    <span className="px-1.5 py-0.2 rounded bg-blue-200/70 text-blue-900 text-[10px] font-semibold font-mono">datacollection0709@gmail.com</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                    1. Click below to open Google Drive • 2. Upload file & click Share → Copy Link • 3. Paste link below.
+                  </p>
+                </div>
+                <a
+                  href="https://drive.google.com/drive/my-drive"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm transition-all flex-shrink-0"
+                >
+                  <span>Open Google Drive</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddHyperlink} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Google Drive / Cloud Link *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="https://drive.google.com/file/d/..."
+                  value={hyperlinkInput}
+                  onChange={(e) => setHyperlinkInput(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Proof Title / Label (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Geotagged Classroom Photo, DELNET Certificate"
+                  value={hyperlinkLabel}
+                  onChange={(e) => setHyperlinkLabel(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={isUploading || isLimitReached}
+                leftIcon={<Plus className="w-3.5 h-3.5" />}
+              >
+                Save Google Drive Proof
+              </Button>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 2: FILE UPLOAD DROPZONE */}
         {activeTab === 'upload' && (
           <div>
             {isLimitReached ? (
@@ -335,54 +413,12 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                   </Button>
 
                   <p className="text-[11px] text-slate-500 mt-2">
-                    JPG, PNG, WEBP, or PDF • <strong>Max 2 MB per file</strong> • Auto-embedded into Excel
+                    JPG, PNG, WEBP, or PDF • <strong>Max 2 MB per file</strong> • Embedded into Excel
                   </p>
                 </div>
               </div>
             )}
           </div>
-        )}
-
-        {/* TAB 2: HYPERLINK (STRATEGY 3) */}
-        {activeTab === 'link' && (
-          <form onSubmit={handleAddHyperlink} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Link Title / Label (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Geotagged Classroom Photos on Google Drive"
-                value={hyperlinkLabel}
-                onChange={(e) => setHyperlinkLabel(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Hyperlink URL (Google Drive, Cloud Storage, or Institutional Link) *
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="https://drive.google.com/drive/folders/..."
-                value={hyperlinkInput}
-                onChange={(e) => setHyperlinkInput(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-lg border border-slate-300 focus:border-brand-500 outline-none bg-white font-mono"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={isUploading || isLimitReached}
-              leftIcon={<Plus className="w-3.5 h-3.5" />}
-            >
-              Add Hyperlink Proof
-            </Button>
-          </form>
         )}
 
         {/* ATTACHED PROOFS LIST WITH THUMBNAILS */}
