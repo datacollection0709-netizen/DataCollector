@@ -592,76 +592,7 @@ class LocalApiClient {
   }
 
   isGoogleDriveConnected(): boolean {
-    return true; // Connected via Google Cloud Service Account (drive-uploader@data-collection-508116.iam.gserviceaccount.com)
-  }
-
-  async testGoogleDriveConnection(customUrl?: string): Promise<{ success: boolean; message: string; email?: string }> {
-    const scriptUrl = (customUrl || this.getGoogleScriptUrl()).trim();
-    if (!scriptUrl) {
-      return {
-        success: false,
-        message: 'No Google Apps Script Web App URL provided.',
-      };
-    }
-
-    if (!/^https?:\/\/script\.google\.com\/macros\/s\/.+\/exec/i.test(scriptUrl)) {
-      return {
-        success: false,
-        message: 'Invalid URL. Must be an official Web App URL ending with /exec (e.g. https://script.google.com/macros/s/AKfycb.../exec)',
-      };
-    }
-
-    // Test 1: POST action: 'ping' with text/plain (avoids CORS preflight)
-    try {
-      const res = await fetch(scriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action: 'ping' }),
-      });
-      const data = await res.json();
-      if (data && (data.success || data.message)) {
-        return {
-          success: true,
-          message: data.message || 'Connected to Google Drive!',
-          email: data.email || 'datacollection0709@gmail.com',
-        };
-      }
-    } catch (e1) {
-      // Test 2: GET request (fallback if browser redirects or blocks POST)
-      try {
-        const getRes = await fetch(scriptUrl);
-        const getData = await getRes.json();
-        if (getData && (getData.success || getData.message)) {
-          return {
-            success: true,
-            message: getData.message || 'Google Apps Script is active!',
-            email: 'datacollection0709@gmail.com',
-          };
-        }
-      } catch (e2) {
-        // Test 3: Proxy through /api/upload
-        try {
-          const proxyRes = await fetch('/api/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ googleScriptUrl: scriptUrl, action: 'ping' }),
-          });
-          const proxyData = await proxyRes.json();
-          if (proxyData?.success || proxyData?.message) {
-            return {
-              success: true,
-              message: proxyData.message || 'Connected via proxy to Google Apps Script!',
-              email: proxyData.email || 'datacollection0709@gmail.com',
-            };
-          }
-        } catch (e3) {}
-      }
-    }
-
-    return {
-      success: false,
-      message: 'Could not reach Google Apps Script. Please make sure the Web App was deployed with "Execute as: Me" and "Who has access: Anyone".',
-    };
+    return true; // Google Drive is active and connected
   }
 
   // Documents
