@@ -17,6 +17,9 @@ import {
   MessageSquare,
   Paperclip,
   Info,
+  ExternalLink,
+  Layers,
+  Zap,
 } from 'lucide-react';
 import { YearGridField } from '../components/form/YearGridField';
 import { DocumentUploadModal } from '../components/form/DocumentUploadModal';
@@ -54,13 +57,14 @@ export const SectionForm: React.FC<SectionFormProps> = ({
   const [viewMode, setViewMode] = useState<'sheet' | 'cards'>('sheet');
   const [selectedUploadField, setSelectedUploadField] = useState<any | null>(null);
   const [activeRemarkField, setActiveRemarkField] = useState<string | null>(null);
+  const [isPreFilling, setIsPreFilling] = useState(false);
 
   const formDataRef = useRef<Record<string, any>>({});
   const isDirtyRef = useRef<boolean>(false);
   const refreshTimerRef = useRef<any>(null);
 
-  // Initialize form data from submission values
-  const initFormData = useCallback(() => {
+  // Initialize form data on mount or when section changes
+  useEffect(() => {
     if (submission?.values) {
       const initial: Record<string, any> = {};
       for (const val of submission.values) {
@@ -84,13 +88,9 @@ export const SectionForm: React.FC<SectionFormProps> = ({
       isDirtyRef.current = false;
       setIsDirty(false);
     }
-  }, [submission?.values]);
+  }, [sectionCode, submission?.id]);
 
-  useEffect(() => {
-    initFormData();
-  }, [submission?.id, sectionCode, initFormData]);
-
-  // Flush save on unmount or section change
+  // Flush save on unmount or section switch
   useEffect(() => {
     return () => {
       if (isDirtyRef.current && submission?.id) {
@@ -101,9 +101,9 @@ export const SectionForm: React.FC<SectionFormProps> = ({
         }
       }
     };
-  }, [submission?.id, onRefreshSubmission]);
+  }, [sectionCode, submission?.id]);
 
-  // Handle value change with instant saving
+  // Handle value change with instant synchronous saving
   const handleFieldChange = (yearCode: string, fieldCode: string, updates: any) => {
     const key = `${fieldCode}_${yearCode}`;
     const prev = formDataRef.current[key] || { fieldCode, yearCode };
@@ -135,7 +135,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
     setFormData(nextData);
     setIsDirty(true);
 
-    // Immediately persist to localStorage synchronously
+    // Persist synchronously to localStorage
     if (submission?.id) {
       api.saveDraft(submission.id, Object.values(nextData));
     }
@@ -144,13 +144,12 @@ export const SectionForm: React.FC<SectionFormProps> = ({
       clearTimeout(refreshTimerRef.current);
     }
     refreshTimerRef.current = setTimeout(() => {
-      onRefreshSubmission();
       setLastSavedTime(
         new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
       );
       isDirtyRef.current = false;
       setIsDirty(false);
-    }, 300);
+    }, 200);
   };
 
   // Toggle All NA for a field
@@ -177,48 +176,20 @@ export const SectionForm: React.FC<SectionFormProps> = ({
     }
   };
 
-  // Auto-fill realistic demo data for fast evaluation
-  const handleAutoFillDemo = () => {
-    const nextData = { ...formDataRef.current };
-    (section?.fields || []).forEach((field: any, idx: number) => {
-      years.forEach((y, yrIdx) => {
-        const key = `${field.code}_${y.code}`;
-        let sampleVal: any = {
-          fieldCode: field.code,
-          yearCode: y.code,
-          isNotApplicable: false,
-        };
-
-        if (field.fieldType === 'NUMBER') {
-          sampleVal.numericValue = 10 + (idx * 3) + (yrIdx * 2);
-          sampleVal.textValue = String(sampleVal.numericValue);
-        } else if (field.fieldType === 'CURRENCY') {
-          sampleVal.numericValue = 150000 + (idx * 50000) + (yrIdx * 25000);
-          sampleVal.textValue = `₹ ${sampleVal.numericValue.toLocaleString('en-IN')}`;
-        } else if (field.fieldType === 'PERCENTAGE') {
-          sampleVal.numericValue = 65.5 + (yrIdx * 4.2);
-          sampleVal.textValue = `${sampleVal.numericValue.toFixed(2)}%`;
-        } else if (field.fieldType === 'BOOLEAN') {
-          sampleVal.textValue = 'Yes';
-          sampleVal.numericValue = 1;
-        } else if (field.fieldType === 'RATIO') {
-          sampleVal.ratioNumerator = 300 + (yrIdx * 50);
-          sampleVal.ratioDenominator = 20 + (yrIdx * 5);
-          sampleVal.textValue = `1:${Math.round(sampleVal.ratioNumerator / sampleVal.ratioDenominator)}`;
-          sampleVal.numericValue = Math.round(sampleVal.ratioNumerator / sampleVal.ratioDenominator);
-        } else {
-          sampleVal.textValue = 'Operational';
-        }
-
-        nextData[key] = sampleVal;
-      });
-    });
-
-    formDataRef.current = nextData;
-    setFormData(nextData);
-    if (submission?.id) {
-      api.saveDraft(submission.id, Object.values(nextData));
+  // 1-Click Auto-Fill for ALL 5 Sections
+  const handleAutoFillAllSections = async () => {
+    if (!submission?.id) return;
+    setIsPreFilling(true);
+    try {
+      await api.prefillAllSections(submission.id);
       onRefreshSubmission();
+      setLastSavedTime(
+        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+    } catch (e: any) {
+      alert('Pre-fill error: ' + e.message);
+    } finally {
+      setIsPreFilling(false);
     }
   };
 
@@ -273,7 +244,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
       if (!v) return false;
       if (v.isNotApplicable) return true;
       if (field.fieldType === 'BOOLEAN') return v.textValue === 'Yes' || v.textValue === 'No';
-      if (field.fieldType === 'RATIO') return !!(v.ratioNumerator && v.ratioDenominator);
+      if (field.fieldType === 'RATIO') return !!(v.ratioNumerator && v.ratioDenominator) || !!v.textValue;
       if (
         field.fieldType === 'NUMBER' ||
         field.fieldType === 'DECIMAL' ||
@@ -290,7 +261,6 @@ export const SectionForm: React.FC<SectionFormProps> = ({
   const sectionPercentage = totalFields > 0 ? Math.round((completedFieldsCount / totalFields) * 100) : 0;
   const pendingCount = totalFields - completedFieldsCount;
 
-  // Filter fields if user wants to see pending only
   const displayedFields = filterPendingOnly
     ? (section.fields || []).filter((f: any) => !isFieldComplete(f))
     : (section.fields || []);
@@ -298,10 +268,44 @@ export const SectionForm: React.FC<SectionFormProps> = ({
   const documents = submission?.documents || [];
 
   return (
-    <div className="space-y-6">
-      {/* Modern, Airy Header Card */}
+    <div className="space-y-5">
+      {/* Top Horizontal Section Navigation Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {sectionCodes.map((code) => {
+          const isActive = code === sectionCode;
+          const secMeta = attribute?.sections?.find((s: any) => s.code === code);
+          return (
+            <button
+              key={code}
+              type="button"
+              onClick={() => onNavigateSection(code)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all shadow-2xs ${
+                isActive
+                  ? 'bg-brand-600 text-white shadow-md shadow-brand-500/20 ring-2 ring-brand-500/20'
+                  : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+              }`}
+            >
+              <span className={`font-mono font-bold ${isActive ? 'text-white' : 'text-brand-700'}`}>
+                {code}
+              </span>
+              <span className="hidden sm:inline">{secMeta?.title?.split(' ')[0]}</span>
+            </button>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={onNavigateReview}
+          className="ml-auto flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-sm"
+        >
+          <span>Review & Submit</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Section Header Card */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <span className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 text-white font-mono font-bold text-base flex items-center justify-center shadow-md shadow-brand-500/20 flex-shrink-0">
               {section.code}
@@ -314,6 +318,12 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
                   {completedFieldsCount} of {totalFields} answered
                 </span>
+                {lastSavedTime && (
+                  <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    <CheckCircle className="w-3 h-3 text-emerald-500" />
+                    Auto-saved {lastSavedTime}
+                  </span>
+                )}
               </div>
               {section.description && (
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-2xl">
@@ -324,32 +334,37 @@ export const SectionForm: React.FC<SectionFormProps> = ({
           </div>
 
           {/* Action Toolbar */}
-          <div className="flex items-center gap-2.5 self-end md:self-auto flex-wrap justify-end">
+          <div className="flex items-center gap-2 self-end lg:self-auto flex-wrap justify-end">
+            {/* 1-Click Auto-Fill ALL Sections */}
+            <button
+              type="button"
+              onClick={handleAutoFillAllSections}
+              disabled={isPreFilling}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition-all shadow-sm disabled:opacity-50"
+              title="Instantly pre-fill all 5 sections with realistic NAAC metrics & photos"
+            >
+              {isPreFilling ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+              ) : (
+                <Zap className="w-3.5 h-3.5 text-yellow-300" />
+              )}
+              <span>{isPreFilling ? 'Populating...' : '⚡ 1-Click Auto-Fill (All Sections)'}</span>
+            </button>
+
             {/* Download Excel Button */}
             <button
               type="button"
               onClick={handleQuickDownloadExcel}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-sm"
-              title="Download full Excel report with all data"
+              title="Download full Excel report with all data & photos"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>Download Excel</span>
             </button>
 
-            {/* Auto-fill Sample Data Button */}
-            <button
-              type="button"
-              onClick={handleAutoFillDemo}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition-all shadow-sm"
-              title="Instantly fill realistic sample data to test the sheet"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-              <span>Auto-Fill Demo</span>
-            </button>
-
             {nextCode ? (
               <Button variant="primary" size="sm" onClick={handleNext} rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
-                Next
+                Next Section
               </Button>
             ) : (
               <Button variant="success" size="sm" onClick={handleNext} rightIcon={<CheckSquare className="w-3.5 h-3.5" />}>
@@ -363,8 +378,8 @@ export const SectionForm: React.FC<SectionFormProps> = ({
         <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex-1 max-w-md">
             <div className="flex justify-between items-center text-xs mb-1.5 font-medium">
-              <span className="text-slate-600">Section Progress</span>
-              <span className="text-slate-900 font-bold font-mono">{sectionPercentage}% Complete</span>
+              <span className="text-slate-600">Section Completion</span>
+              <span className="text-slate-900 font-bold font-mono">{sectionPercentage}%</span>
             </div>
             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
               <div
@@ -385,7 +400,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                     ? 'bg-white text-brand-700 shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="Easy, compact spreadsheet table view"
+                title="Spreadsheet view"
               >
                 <Table className="w-3.5 h-3.5" />
                 <span>Sheet View</span>
@@ -398,14 +413,14 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                     ? 'bg-white text-brand-700 shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="Detailed card-by-card view"
+                title="Card by card view"
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
                 <span>Card View</span>
               </button>
             </div>
 
-            {/* Filter Toggle: All vs Pending Only */}
+            {/* Filter Toggle: All vs Pending */}
             <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
               <button
                 type="button"
@@ -437,7 +452,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
         </div>
       </div>
 
-      {/* VIEW MODE 1: EFFORTLESS QUICK SHEET VIEW (SPREADSHEET TABLE) */}
+      {/* VIEW MODE 1: EFFORTLESS SPREADSHEET SHEET VIEW */}
       {viewMode === 'sheet' ? (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -445,13 +460,13 @@ export const SectionForm: React.FC<SectionFormProps> = ({
               <thead>
                 <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                   <th className="py-3 px-3 w-16 text-center font-mono">Code</th>
-                  <th className="py-3 px-4 min-w-[260px]">Facility / Indicator</th>
+                  <th className="py-3 px-4 min-w-[240px]">Facility / Indicator</th>
                   {years.map((y) => (
                     <th key={y.code} className="py-3 px-3 text-center w-36 font-mono font-bold text-slate-700">
                       {y.code}
                     </th>
                   ))}
-                  <th className="py-3 px-4 text-center w-40">Actions & Proofs</th>
+                  <th className="py-3 px-4 text-center w-48">Proofs, Photos & Links</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -466,7 +481,11 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                   displayedFields.map((field: any, rIdx: number) => {
                     const isAllNA = years.every((y) => formData[`${field.code}_${y.code}`]?.isNotApplicable);
                     const fieldDocs = documents.filter((d: any) => (d.fieldCode || d.field?.code) === field.code);
+                    const photoDocs = fieldDocs.filter((d: any) =>
+                      d.mimeType?.startsWith('image/') || d.dataUrl?.startsWith('data:image/') || /\.(jpg|jpeg|png|webp)$/i.test(d.originalFileName || '')
+                    );
                     const hasProof = fieldDocs.length > 0;
+                    const isTextField = field.fieldType === 'TEXT' || field.fieldType === 'MULTI_SELECT';
 
                     return (
                       <tr
@@ -485,7 +504,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                           <div className="font-semibold text-slate-800 text-xs sm:text-sm">{field.label}</div>
                           <div className="flex items-center gap-2 mt-0.5">
                             {field.unit && (
-                              <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded">
+                              <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded font-medium">
                                 {field.unit}
                               </span>
                             )}
@@ -545,7 +564,26 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                                     No
                                   </button>
                                 </div>
+                              ) : isTextField ? (
+                                /* TEXT INPUT (Section 3.3 & 3.5): PRESERVE STRINGS CLEANLY! */
+                                <div className="relative flex items-center bg-white border border-slate-200 hover:border-slate-300 focus-within:border-brand-500 rounded-lg overflow-hidden transition-all shadow-2xs">
+                                  <input
+                                    type="text"
+                                    placeholder="Enter details..."
+                                    value={val.textValue || ''}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      handleFieldChange(year.code, field.code, {
+                                        textValue: raw,
+                                        numericValue: null,
+                                        isNotApplicable: false,
+                                      });
+                                    }}
+                                    className="w-full py-1.5 px-2.5 text-left text-xs text-slate-900 border-0 outline-none focus:ring-0"
+                                  />
+                                </div>
                               ) : (
+                                /* NUMERIC / CURRENCY / PERCENTAGE INPUT */
                                 <div className="relative flex items-center bg-white border border-slate-200 hover:border-slate-300 focus-within:border-brand-500 rounded-lg overflow-hidden transition-all shadow-2xs">
                                   {field.fieldType === 'CURRENCY' && (
                                     <span className="pl-2 text-slate-400 font-bold text-xs select-none">₹</span>
@@ -560,7 +598,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                                     }
                                     onChange={(e) => {
                                       const raw = e.target.value;
-                                      const num = raw === '' ? null : Number(raw.replace(/[^0-9.]/g, ''));
+                                      const num = raw === '' ? null : parseFloat(raw.replace(/[^0-9.]/g, ''));
                                       handleFieldChange(year.code, field.code, {
                                         numericValue: isNaN(num as number) ? null : num,
                                         textValue: raw,
@@ -578,9 +616,9 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                           );
                         })}
 
-                        {/* Actions & Proofs */}
+                        {/* Actions, Proof Photos & Hyperlinks */}
                         <td className="py-2.5 px-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
                             {/* N/A Toggle */}
                             <button
                               type="button"
@@ -595,18 +633,24 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                               {isAllNA ? 'N/A' : 'Set N/A'}
                             </button>
 
-                            {/* Proof Upload Modal trigger */}
+                            {/* Proofs & Photos Button */}
                             <button
                               type="button"
                               onClick={() => setSelectedUploadField(field)}
-                              className={`p-1.5 rounded-md border transition-all ${
+                              className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-all flex items-center gap-1 ${
                                 hasProof
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                                  : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                               }`}
-                              title={hasProof ? `${fieldDocs.length} proof(s) uploaded` : 'Upload proof document'}
+                              title={hasProof ? `${fieldDocs.length} proof(s) attached (Max 3)` : 'Add photo proof or link'}
                             >
                               <Paperclip className="w-3.5 h-3.5" />
+                              <span>{hasProof ? `${fieldDocs.length}/3` : 'Add Proof'}</span>
+                              {photoDocs.length > 0 && (
+                                <span className="text-[9px] bg-emerald-200 text-emerald-800 px-1 rounded-full font-mono">
+                                  📷{photoDocs.length}
+                                </span>
+                              )}
                             </button>
 
                             {/* Remarks toggle */}
@@ -615,7 +659,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                               onClick={() =>
                                 setActiveRemarkField(activeRemarkField === field.code ? null : field.code)
                               }
-                              className={`p-1.5 rounded-md border transition-all ${
+                              className={`p-1 rounded-md border transition-all ${
                                 activeRemarkField === field.code ||
                                 years.some((y) => formData[`${field.code}_${y.code}`]?.remarks)
                                   ? 'bg-brand-50 text-brand-600 border-brand-200'
@@ -627,12 +671,12 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                             </button>
                           </div>
 
-                          {/* Remarks popover / row drawer */}
+                          {/* Remarks drawer */}
                           {activeRemarkField === field.code && (
                             <div className="mt-2 text-left">
                               <textarea
                                 rows={2}
-                                placeholder="Add contextual notes..."
+                                placeholder="Add contextual audit remarks..."
                                 value={years.map((y) => formData[`${field.code}_${y.code}`]?.remarks).filter(Boolean)[0] || ''}
                                 onChange={(e) => {
                                   const text = e.target.value;
@@ -664,7 +708,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
 
             return (
               <YearGridField
-                key={field.code}
+                key={field.id}
                 field={field}
                 years={years}
                 values={fieldValues}
@@ -678,39 +722,28 @@ export const SectionForm: React.FC<SectionFormProps> = ({
         </div>
       )}
 
-      {/* Bottom Action Footer */}
-      <div className="flex items-center justify-between pt-6 border-t border-slate-200">
+      {/* Bottom Navigation */}
+      <div className="flex items-center justify-between pt-4 border-t border-slate-200">
         {prevCode ? (
           <Button variant="outline" size="sm" onClick={handlePrev} leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}>
-            Previous ({prevCode})
+            Previous: Section {prevCode}
           </Button>
         ) : (
           <div />
         )}
 
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleQuickDownloadExcel}
-            leftIcon={<FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />}
-          >
-            Export Excel
+        {nextCode ? (
+          <Button variant="primary" size="sm" onClick={handleNext} rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
+            Next: Section {nextCode}
           </Button>
-
-          {nextCode ? (
-            <Button variant="primary" size="sm" onClick={handleNext} rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
-              Continue to {nextCode}
-            </Button>
-          ) : (
-            <Button variant="success" size="sm" onClick={onNavigateReview} rightIcon={<CheckSquare className="w-3.5 h-3.5" />}>
-              Final Review & Submit
-            </Button>
-          )}
-        </div>
+        ) : (
+          <Button variant="success" size="sm" onClick={handleNext} rightIcon={<CheckSquare className="w-3.5 h-3.5" />}>
+            Proceed to Final Review & Submit
+          </Button>
+        )}
       </div>
 
-      {/* Upload Modal */}
+      {/* Modal for Photo Proofs & Hyperlinks */}
       {selectedUploadField && (
         <DocumentUploadModal
           isOpen={true}

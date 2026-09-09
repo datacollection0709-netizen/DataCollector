@@ -13,6 +13,8 @@ import {
   AlertCircle,
   Download,
   Mail,
+  ExternalLink,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -43,6 +45,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [mailtoUrl, setMailtoUrl] = useState<string | null>(null);
 
   const toggleCollapse = (code: string) => {
     setCollapsedSections((prev) => ({ ...prev, [code]: !prev[code] }));
@@ -88,8 +91,11 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await api.submitForReview(submission.id);
+      const res = await api.submitForReview(submission.id);
       setSubmitSuccess(true);
+      if (res.mailtoUrl) {
+        setMailtoUrl(res.mailtoUrl);
+      }
       setShowConfirmModal(false);
       onRefreshSubmission();
     } catch (err: any) {
@@ -112,14 +118,14 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
               <StatusBadge status={submission?.status || 'DRAFT'} />
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
                 <Mail className="w-3 h-3 text-slate-400" />
-                Admin: datacollection0709@gmail.com
+                Target: datacollection0709@gmail.com
               </span>
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               Attribute 3: Comprehensive Review
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              Verify all institutional indicators, proof attachments, and calculations across 2023–24, 2024–25, and 2025–26.
+              Verify all metrics, in-cell photo evidence (max 2 MB), and Drive links across 2023–24, 2024–25, and 2025–26.
             </p>
           </div>
 
@@ -135,29 +141,14 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
           </div>
         </div>
 
-        {/* Missing Proofs Alert (Informational) */}
-        {progress?.missingRequiredProofs?.length > 0 && (
-          <div className="mt-4 p-4 bg-amber-50/80 border border-amber-200 rounded-xl text-amber-900 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <div className="font-bold text-xs uppercase tracking-wider text-amber-800">
-                {progress.missingRequiredProofs.length} Optional Proof Document(s) Not Yet Attached:
-              </div>
-              <ul className="text-xs list-disc list-inside mt-1 space-y-0.5 text-amber-800/90">
-                {progress.missingRequiredProofs.slice(0, 5).map((p: any) => (
-                  <li key={p.fieldCode}>
-                    <span className="font-semibold font-mono">{p.fieldCode}</span>: {p.label}
-                  </li>
-                ))}
-                {progress.missingRequiredProofs.length > 5 && (
-                  <li className="list-none text-slate-500 italic mt-0.5">
-                    + {progress.missingRequiredProofs.length - 5} more indicators
-                  </li>
-                )}
-              </ul>
-            </div>
+        {/* Informational Alerts */}
+        <div className="mt-4 p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-start gap-2.5">
+          <Mail className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="leading-relaxed">
+            <strong>Admin Mailbox Notice:</strong> Submissions are automatically forwarded to <strong>datacollection0709@gmail.com</strong>.
+            The complete Excel workbook with embedded photo evidence is also downloaded directly to your device upon submitting.
           </div>
-        )}
+        </div>
 
         {/* Submit Actions */}
         <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3 flex-wrap">
@@ -167,11 +158,25 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
             </span>
           )}
           {submitSuccess && (
-            <span className="text-emerald-700 text-xs font-semibold mr-auto bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              Submission recorded & sent to datacollection0709@gmail.com!
-            </span>
+            <div className="mr-auto flex items-center gap-2 flex-wrap">
+              <span className="text-emerald-700 text-xs font-semibold bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Submitted & Excel Downloaded!
+              </span>
+              {mailtoUrl && (
+                <a
+                  href={mailtoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors flex items-center gap-1.5"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Open in Gmail (Direct Send)</span>
+                </a>
+              )}
+            </div>
           )}
+
           <Button
             onClick={() => setShowConfirmModal(true)}
             isLoading={isSubmitting}
@@ -192,11 +197,12 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-bold text-slate-900">Confirm Submission</h3>
-                <p className="text-xs text-slate-500">Submit to datacollection0709@gmail.com</p>
+                <p className="text-xs text-slate-500">Dispatch to datacollection0709@gmail.com</p>
               </div>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Your response will be recorded into the institutional Google Sheet and proof documents will be permanently organized in Google Drive. An automated notification email will be dispatched to <strong>datacollection0709@gmail.com</strong>.
+              Your response will be recorded and an audit notification email will be dispatched to <strong>datacollection0709@gmail.com</strong>.
+              The final Excel report with your in-cell photos and hyperlinks will also be downloaded immediately.
             </p>
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <Button variant="outline" size="sm" onClick={() => setShowConfirmModal(false)}>
@@ -271,11 +277,11 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                     <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
                         <th className="py-2.5 px-3 w-20 font-mono">Sr. No.</th>
-                        <th className="py-2.5 px-3 min-w-[240px]">Facility / Resource</th>
+                        <th className="py-2.5 px-3 min-w-[220px]">Facility / Resource</th>
                         <th className="py-2.5 px-3 text-center w-28 font-mono">2023–24</th>
                         <th className="py-2.5 px-3 text-center w-28 font-mono">2024–25</th>
                         <th className="py-2.5 px-3 text-center w-28 font-mono">2025–26</th>
-                        <th className="py-2.5 px-3 min-w-[200px]">Attached Proofs & Remarks</th>
+                        <th className="py-2.5 px-3 min-w-[220px]">Attached Proofs & Photos</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -350,24 +356,38 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                             <td className="py-2.5 px-3 text-center bg-slate-50/30">{renderCell(v3)}</td>
                             <td className="py-2.5 px-3">
                               {docs.length > 0 ? (
-                                <div className="space-y-1">
-                                  {docs.map((d: any) => (
-                                    <div key={d.id} className="flex items-center gap-1.5 text-brand-600">
-                                      <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                                      <a
-                                        href={d.fileUrl && d.fileUrl !== '#' ? d.fileUrl : undefined}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="truncate max-w-[200px] hover:underline"
-                                        title={d.originalFileName}
+                                <div className="flex flex-wrap gap-2 items-center">
+                                  {docs.map((d: any, dIdx: number) => {
+                                    const isPhoto =
+                                      d.mimeType?.startsWith('image/') ||
+                                      d.dataUrl?.startsWith('data:image/') ||
+                                      /\.(jpg|jpeg|png|webp)$/i.test(d.originalFileName || '');
+
+                                    return (
+                                      <div
+                                        key={d.id || dIdx}
+                                        className="flex items-center gap-1 bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg text-[11px]"
                                       >
-                                        {d.originalFileName}
-                                      </a>
-                                    </div>
-                                  ))}
+                                        {isPhoto && d.dataUrl ? (
+                                          <img
+                                            src={d.dataUrl}
+                                            alt="Proof"
+                                            className="w-5 h-5 object-cover rounded flex-shrink-0"
+                                          />
+                                        ) : d.hyperlink ? (
+                                          <ExternalLink className="w-3.5 h-3.5 text-brand-600 flex-shrink-0" />
+                                        ) : (
+                                          <FileText className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
+                                        )}
+                                        <span className="truncate max-w-[110px] font-medium text-slate-700">
+                                          {d.originalFileName || d.fileName}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               ) : (
-                                <span className="text-slate-400 italic">No proof attached</span>
+                                <span className="text-slate-400 italic text-[11px]">No proof attached</span>
                               )}
                             </td>
                           </tr>
