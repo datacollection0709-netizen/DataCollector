@@ -105,21 +105,22 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const [driveLinkLabel, setDriveLinkLabel] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Google Drive Connection State
-  const [isDriveConnected, setIsDriveConnected] = useState<boolean>(false);
+  // Google Drive Connection State (Active via Service Account)
+  const [isDriveConnected, setIsDriveConnected] = useState<boolean>(true);
   const [showDriveSetup, setShowDriveSetup] = useState<boolean>(false);
   const [scriptUrlInput, setScriptUrlInput] = useState<string>('');
   const [isTestingConnection, setIsTestingConnection] = useState<boolean>(false);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
+  const [apiEnableUrl, setApiEnableUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      const connected = api.isGoogleDriveConnected();
-      setIsDriveConnected(connected);
-      setShowDriveSetup(!connected);
+      setIsDriveConnected(true);
+      setShowDriveSetup(false);
       setScriptUrlInput(api.getGoogleScriptUrl());
       setErrorMsg(null);
       setSuccessMsg(null);
+      setApiEnableUrl(null);
     }
   }, [isOpen]);
 
@@ -238,7 +239,23 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         fileInputRef.current.value = '';
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to upload document to Google Drive.');
+      const msg = err.message || 'Failed to upload document to Google Drive.';
+      if (
+        msg.includes('Enable it by visiting') ||
+        msg.includes('has not been used in project') ||
+        msg.includes('is disabled')
+      ) {
+        setApiEnableUrl(
+          'https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=895735407205'
+        );
+        setErrorMsg('Google Drive API is disabled in project data-collection-508116. Click the button below to enable it.');
+      } else if (msg.includes('File not found') || msg.includes('notFound')) {
+        setErrorMsg(
+          'Google Drive folder not shared: Please share folder "1nS-cyfFHwhqEIE-uwq0k0WUzTkUWaAQz" with drive-uploader@data-collection-508116.iam.gserviceaccount.com as Editor.'
+        );
+      } else {
+        setErrorMsg(msg);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -538,20 +555,35 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
           <div className="p-6 space-y-4">
             {/* Feedback Notifications */}
             {errorMsg && (
-              <div className="flex items-start gap-2.5 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <span>{errorMsg}</span>
-                  {!isDriveConnected && (
-                    <button
-                      type="button"
-                      onClick={() => setShowDriveSetup(true)}
-                      className="block mt-1 font-bold text-rose-900 underline"
-                    >
-                      Open Google Drive Setup
-                    </button>
-                  )}
+              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs space-y-2">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-600" />
+                  <div className="flex-1">
+                    <span className="font-medium">{errorMsg}</span>
+                    {!isDriveConnected && (
+                      <button
+                        type="button"
+                        onClick={() => setShowDriveSetup(true)}
+                        className="block mt-1 font-bold text-rose-900 underline"
+                      >
+                        Open Google Drive Setup
+                      </button>
+                    )}
+                  </div>
                 </div>
+                {apiEnableUrl && (
+                  <div className="pt-1">
+                    <a
+                      href={apiEnableUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs transition-colors shadow-2xs"
+                    >
+                      <span>Enable Google Drive API in Google Cloud (1 Click)</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 

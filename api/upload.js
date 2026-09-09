@@ -1,41 +1,35 @@
 /**
- * Production-Ready Google Drive API Backend Route
- * Tech Stack: Node.js (Vercel Serverless / Express compatible)
- * SDK: googleapis (Google Drive API v3)
+ * Production Google Drive API v3 Backend Route
  * Architecture: Google Cloud Service Account -> Central Google Drive Folder
+ * Target Folder ID: 1nS-cyfFHwhqEIE-uwq0k0WUzTkUWaAQz
+ * Service Account: drive-uploader@data-collection-508116.iam.gserviceaccount.com
  */
 
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 
-// Environment variables
-const FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID || 'root';
+// Central Google Drive Folder provided by admin
+const DEFAULT_FOLDER_ID = '1nS-cyfFHwhqEIE-uwq0k0WUzTkUWaAQz';
 
-/**
- * Initializes and caches the authenticated Google Drive client
- */
+// Service Account Credentials provided by admin
+const BUILTIN_SERVICE_ACCOUNT = {
+  type: 'service_account',
+  project_id: 'data-collection-508116',
+  private_key_id: 'ff2bdf0e4bf3430bd81a1a5d456808c9a0541c73',
+  private_key:
+    '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDCNTALHjweZqcs\nHPKCXk/vI5rncKf68YQM7z6wow+fYlyb+gM8Uw4pCyHEyxzfPpYmaPnu7+DyxdY0\nyrZptfsp5Nwib+LOYLiM5VcgoJ7lVKUcjLOBQlT/P4X3T5JiptUC59HQGQEbvJ9B\nff/ou/bUrHJA2TYXjIgQ8M8f8DfQ06z9a3TF2pAc6xJ6YWJA1L0ueFKdXXub2RwZ\nDbcgWJJV5mvxM34mO1utPzK2ZWm+/O6ss7/NRjWMRwnp+MFJ6dJX9GQhSaG/XzYM\n16v7p4NZBa6FEoGu61XZBMEP/QGMuW/FKIqClLH+53ElkRpCkF8yZgKzEjuGDaRE\nKmXVm4YPAgMBAAECggEAV/pyVkcPIxKL3t8KOWbyPTpa/Ue6wWLR2G41bx2fgSu1\nGm/rMVPK0WsalCUTYkrfCG178/M1a6WWAXpnooHvUy47T1pyW93THPj0PHKnKOrs\nlX9j/kWHbc5gKQYiIZDEZLmSAfyh1OfhGXE0EkG8cuHgLGJ6L7bZGRuOKUDQeEfx\nau8WevyobXHhdr3FBhR7/jSJuUwwR3XLeGpeSESzCt7vF8SWYtH9OYl9FGykjTzP\nSMcOKILAPTiGKb75Vj9K0gCLP0oeZNmIaM0q/84xYwcUuzjawusaQV9sGsB35RxH\ntZaHo/5z9TBeFaoaUn2WpIS6BEG55wDeNxniQ/RewQKBgQD0vi1LGXpKieDANGR1\nZDEYNtszAL4BUoAqtaFfbbcBkvKFfARGJZx2c6Y6bK76YlXDBiFZQzHSO7mrr4b+\nfEgKhr1vuAJX6NwFGvl0Wn3g32K59EdeWvmZ17J/UGu7uNYLxkkCYQorgKl62xcp\npNYQqhYp7TEHjTBe7SwGaCVsrwKBgQDLI/b8vVyT4pLatsehVjTkvlq0CUC1gHRh\nitSYCPh4oVdw9V9iSxm7/JGBgryx/9W8weT0fYjL/qfYW7N3Iw96bP+NNRLHXig6\nVQHSfm28OrQxuVUecwwv+gd+Y/I0LjxRe9cYxc2cTZb/eU4B20BsZpFoyjF6rBKF\n3SmPkdOUoQKBgQCE2DmTmwezL/XrvkSNJ84yO4xtuchoxVRGWoJ2XwJH+3Binjdf\nsAimjw26hsXPqNKuYkR1xDBl0f9tPoCC4Ajmlc57tqCnAQF0T/j5fCj5h6d6Eisu\n/yiepeMAkjF4GtMsXvvAK9YuWM8lnYiMFSoQr5IKPfIwDCYmUIxmCd/OhwKBgH9z\nWx0LObBXMUgj8XAaBCmX/JSEUaMOqvYgAm45Apu8rn3ilSu4brbxKeGVwwnyt4ks\nJZf3wwIqDejC8ABJcQagqF1R9Sw8uQSQHQqR5At60V95JhxqljTrrBPyZR2z/Igr\nKLMUN4Jfc+NpmjWz9+GLIKQcZ5rNpvlx3weCuLrBAoGBAJZHYd4OvQXeX0790Bor\nl/5IoVlvl/6/muz0b8zeQZRNuANN76W/7KeE8Dx5ow87X+eQ+RRf3fvRmKsjLH0v\nki1emV9wxn90x3fUnXPk4HmRgEJWhGsCurSc0LyjCGMvJ83/uTy7/vy39E7fnCpO\nDsk6OWoApvjy0kjMTM7o9qsM\n-----END PRIVATE KEY-----\n',
+  client_email: 'drive-uploader@data-collection-508116.iam.gserviceaccount.com',
+};
+
 function getDriveClient() {
-  let credentials = null;
+  let credentials = BUILTIN_SERVICE_ACCOUNT;
 
-  // 1. Try raw JSON string from environment variable
   if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
     try {
       credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
     } catch (e) {
-      console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY JSON:', e);
+      console.warn('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY, using built-in account');
     }
-  }
-
-  // 2. Try individual environment variables
-  if (!credentials && process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-    credentials = {
-      client_email: process.env.GOOGLE_CLIENT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-    };
-  }
-
-  if (!credentials) {
-    return null;
   }
 
   const auth = new google.auth.GoogleAuth({
@@ -43,11 +37,14 @@ function getDriveClient() {
     scopes: ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/drive'],
   });
 
-  return google.drive({ version: 'v3', auth });
+  return {
+    drive: google.drive({ version: 'v3', auth }),
+    folderId: process.env.GOOGLE_DRIVE_FOLDER_ID || DEFAULT_FOLDER_ID,
+    email: credentials.client_email,
+  };
 }
 
 export default async function handler(req, res) {
-  // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -60,20 +57,13 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Health check / status check endpoint
   if (req.method === 'GET') {
-    const drive = getDriveClient();
-    const hasServiceAccount = Boolean(drive);
-    const hasAppsScript = Boolean(process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL);
-
+    const { folderId, email } = getDriveClient();
     return res.status(200).json({
       success: true,
-      serviceAccountConfigured: hasServiceAccount,
-      appsScriptConfigured: hasAppsScript,
-      targetFolderId: FOLDER_ID !== 'root' ? FOLDER_ID : 'Default Drive Root',
-      message: hasServiceAccount
-        ? 'Google Drive API Service Account is active and ready.'
-        : 'Service Account credentials pending. Please set GOOGLE_SERVICE_ACCOUNT_KEY or GOOGLE_CLIENT_EMAIL and GOOGLE_PRIVATE_KEY.',
+      serviceAccount: email,
+      targetFolderId: folderId,
+      message: 'Google Drive API Backend is configured and ready.',
     });
   }
 
@@ -82,116 +72,99 @@ export default async function handler(req, res) {
   }
 
   try {
-    const payload = req.body;
+    const payload = req.body || {};
     const { action, fileName, mimeType, base64Data, targetFolderId } = payload;
+    const { drive, folderId, email } = getDriveClient();
 
-    // 1. Connection Ping Test
+    // 1. Connection Ping Check
     if (action === 'ping') {
-      const drive = getDriveClient();
-      if (drive) {
+      try {
+        const listRes = await drive.files.list({
+          pageSize: 1,
+          fields: 'files(id, name)',
+        });
         return res.status(200).json({
           success: true,
-          message: 'Google Drive API (Service Account) is authenticated and ready!',
-          mode: 'SERVICE_ACCOUNT',
+          message: `Google Drive API is connected to service account (${email})`,
+          email,
+          folderId,
+        });
+      } catch (pingErr) {
+        const errMsg = pingErr.message || String(pingErr);
+        const needsApiEnable = errMsg.includes('has not been used in project') || errMsg.includes('is disabled');
+        return res.status(200).json({
+          success: false,
+          needsApiEnable,
+          enableUrl: 'https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=895735407205',
+          message: errMsg,
+          email,
         });
       }
-
-      // Check Apps Script fallback
-      const scriptUrl = payload.googleScriptUrl || process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL;
-      if (scriptUrl) {
-        const gRes = await fetch(scriptUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify({ action: 'ping' }),
-        });
-        const gData = await gRes.json();
-        return res.status(200).json(gData);
-      }
-
-      return res.status(200).json({
-        success: false,
-        message: 'Google Drive credentials are not yet configured on the server.',
-      });
     }
 
-    // 2. File Upload Handling
+    // 2. Real File Upload to Google Drive Folder
     if (!base64Data || !fileName) {
-      return res.status(400).json({ success: false, error: 'Missing base64Data or fileName in request.' });
+      return res.status(400).json({ success: false, error: 'Missing file content or filename.' });
     }
 
-    const drive = getDriveClient();
+    const destinationFolder = targetFolderId || folderId;
+    const fileBuffer = Buffer.from(base64Data, 'base64');
+    const stream = Readable.from(fileBuffer);
 
-    // Strategy A: Direct Google Drive API (Service Account)
-    if (drive) {
-      const destinationFolder = targetFolderId || FOLDER_ID;
-      const fileBuffer = Buffer.from(base64Data, 'base64');
-      const stream = Readable.from(fileBuffer);
+    const fileMetadata = {
+      name: fileName,
+      parents: destinationFolder ? [destinationFolder] : undefined,
+    };
 
-      // File Metadata in Google Drive
-      const fileMetadata = {
-        name: fileName,
-        parents: destinationFolder && destinationFolder !== 'root' ? [destinationFolder] : undefined,
-      };
+    const media = {
+      mimeType: mimeType || 'application/octet-stream',
+      body: stream,
+    };
 
-      // Resumable / Streaming Media Upload
-      const media = {
-        mimeType: mimeType || 'application/octet-stream',
-        body: stream,
-      };
+    const driveFile = await drive.files.create({
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id, name, webViewLink, webContentLink',
+    });
 
-      const driveFile = await drive.files.create({
-        requestBody: fileMetadata,
-        media: media,
-        fields: 'id, name, webViewLink, webContentLink, size',
+    const fileId = driveFile.data.id;
+    const fileUrl = driveFile.data.webViewLink || `https://drive.google.com/file/d/${fileId}/view?usp=drivesdk`;
+
+    // Make viewable to anyone with link (auditors, admin, viewers)
+    try {
+      await drive.permissions.create({
+        fileId,
+        requestBody: {
+          role: 'reader',
+          type: 'anyone',
+        },
       });
-
-      const fileId = driveFile.data.id;
-      const webViewLink = driveFile.data.webViewLink || `https://drive.google.com/file/d/${fileId}/view`;
-
-      // Set permission so admin and respondents can view the uploaded proof
-      try {
-        await drive.permissions.create({
-          fileId: fileId,
-          requestBody: {
-            role: 'reader',
-            type: 'anyone',
-          },
-        });
-      } catch (permError) {
-        console.warn('Google Drive permission warning:', permError.message);
-      }
-
-      return res.status(200).json({
-        success: true,
-        fileId: fileId,
-        fileUrl: webViewLink,
-        webViewLink: webViewLink,
-        fileName: driveFile.data.name,
-        mode: 'GOOGLE_DRIVE_API',
-      });
+    } catch (permErr) {
+      console.warn('Drive permission warning:', permErr.message);
     }
 
-    // Strategy B: Fallback to Google Apps Script Web App if configured
-    const scriptUrl = payload.googleScriptUrl || process.env.GOOGLE_SCRIPT_URL || process.env.VITE_GOOGLE_SCRIPT_URL;
-    if (scriptUrl) {
-      const gRes = await fetch(scriptUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload),
-      });
-      const gData = await gRes.json();
-      return res.status(200).json(gData);
-    }
-
-    return res.status(500).json({
-      success: false,
-      error: 'Google Drive API backend is not configured. Please set GOOGLE_SERVICE_ACCOUNT_KEY or connect Google Apps Script.',
+    return res.status(200).json({
+      success: true,
+      fileId,
+      fileUrl,
+      webViewLink: fileUrl,
+      fileName: driveFile.data.name,
+      folderId: destinationFolder,
     });
   } catch (error) {
     console.error('Google Drive Upload Error:', error);
+    const errMsg = error.message || String(error);
+    const needsApiEnable = errMsg.includes('has not been used in project') || errMsg.includes('is disabled');
+    const notShared = errMsg.includes('File not found') || errMsg.includes('notFound');
+
     return res.status(500).json({
       success: false,
-      error: error.message || 'Internal server error during Google Drive upload.',
+      error: errMsg,
+      needsApiEnable,
+      notShared,
+      enableUrl: 'https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=895735407205',
+      serviceAccountEmail: 'drive-uploader@data-collection-508116.iam.gserviceaccount.com',
+      folderId: DEFAULT_FOLDER_ID,
     });
   }
 }

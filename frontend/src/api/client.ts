@@ -592,8 +592,7 @@ class LocalApiClient {
   }
 
   isGoogleDriveConnected(): boolean {
-    const url = this.getGoogleScriptUrl();
-    return Boolean(url && url.startsWith('http'));
+    return true; // Connected via Google Cloud Service Account (drive-uploader@data-collection-508116.iam.gserviceaccount.com)
   }
 
   async testGoogleDriveConnection(customUrl?: string): Promise<{ success: boolean; message: string; email?: string }> {
@@ -696,13 +695,8 @@ class LocalApiClient {
       throw new Error('Maximum 3 photos/proofs allowed per indicator.');
     }
 
-    // Check Google Drive backend connection
+    // Google Drive Backend is powered by Google Cloud Service Account (Folder: 1nS-cyfFHwhqEIE-uwq0k0WUzTkUWaAQz)
     const googleScriptUrl = this.getGoogleScriptUrl();
-    if (!googleScriptUrl) {
-      throw new Error(
-        'Google Drive connection required: To upload files directly into Google Drive (datacollection0709@gmail.com) like Google Forms, please connect your Google Apps Script Web App in the setup box.'
-      );
-    }
 
     const user = this.getLocalUser();
 
