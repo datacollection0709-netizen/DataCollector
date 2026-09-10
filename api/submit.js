@@ -24,8 +24,9 @@ export default async function handler(req, res) {
       submissionData,
       documents = [],
       adminEmail = 'datacollection0709@gmail.com',
+      driveExcelUrl,
       excelBase64,
-      excelFileName = 'Attribute_3_Report.xlsx',
+      excelFileName = 'Resource_Survey_Report.xlsx',
     } = req.body;
 
     // Filter populated values
@@ -52,13 +53,21 @@ export default async function handler(req, res) {
         const buffer = Buffer.from(excelBase64, 'base64');
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         formData.append('attachment', blob, excelFileName);
-        formData.append('_subject', `Attribute 3 Institutional Excel Report: ${userName || 'Officer'} (${department || 'Dept'})`);
+        formData.append('_subject', `Resource Survey Institutional Excel Report: ${userName || 'Officer'} (${department || 'Dept'})`);
         formData.append('Submitter_Name', userName || 'Institutional Officer');
         formData.append('Department', department || 'Department');
         formData.append('Total_Answered_Entries', String(filledValues.length));
         formData.append('Attached_Proofs_Count', String(documents.length));
+        if (driveExcelUrl) {
+          formData.append('Google_Drive_Excel_Report', driveExcelUrl);
+        }
         formData.append('Proofs_and_Links', proofsSummary);
-        formData.append('Message', 'Attached is your official Attribute 3 Institutional Excel report (.xlsx) containing all answered indicators, calculations, and embedded photo evidence.');
+        formData.append(
+          'Message',
+          driveExcelUrl
+            ? `The official institutional Excel report (.xlsx) has been generated and uploaded to Google Drive:\n${driveExcelUrl}\n\nPlease click the link above to view or download the complete workbook.`
+            : 'The official institutional Excel report (.xlsx) has been generated and downloaded.'
+        );
         formData.append('Summary_Data', summaryText);
 
         await fetch(`https://formsubmit.co/ajax/${adminEmail}`, {

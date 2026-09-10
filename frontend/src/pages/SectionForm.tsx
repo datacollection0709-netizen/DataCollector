@@ -64,10 +64,13 @@ export const SectionForm: React.FC<SectionFormProps> = ({
 
   // Initialize form data on mount, sectionCode change, or submission change
   useEffect(() => {
-    // Read freshest values from localStorage first, then fallback to prop
+    // Read freshest values for the active department from localStorage, then fallback to prop
+    const user = api.getLocalUser();
+    const deptKey = api.getDeptKey(user?.organizationName);
     const subsStr = localStorage.getItem('attribute3_submissions');
     const subs = subsStr ? JSON.parse(subsStr) : {};
-    const freshestValues = (submission?.id && subs[submission.id]?.values) || submission?.values || [];
+    const targetSub = subs[deptKey] || (submission?.id && subs[submission.id]) || submission;
+    const freshestValues = targetSub?.values || [];
 
     const initial: Record<string, any> = {};
     for (const val of freshestValues) {

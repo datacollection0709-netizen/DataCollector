@@ -96,7 +96,11 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navbar submissionId={submission?.id} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <Navbar
+        submissionId={submission?.id}
+        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        onDataCleared={loadData}
+      />
 
       <div className="flex-1 flex max-w-7xl w-full mx-auto relative">
         {/* Mobile Sidebar Overlay */}

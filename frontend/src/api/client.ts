@@ -4,9 +4,13 @@ import { proofStorage, StoredProof } from '../utils/imageStorage';
 
 class LocalApiClient {
   // Helpers
-  private getLocalUser() {
+  getLocalUser() {
     const userStr = localStorage.getItem('attribute3_local_user');
     return userStr ? JSON.parse(userStr) : null;
+  }
+
+  getDeptKey(department?: string): string {
+    return (department || 'default').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
   }
 
   private getSubmissionsData() {
@@ -93,15 +97,17 @@ class LocalApiClient {
 
   // Auth
   async login(name: string, department: string) {
-    const userId = `user-${name.replace(/\W+/g, '-').toLowerCase()}-${department.replace(/\W+/g, '-').toLowerCase()}`;
+    const deptKey = this.getDeptKey(department);
+    const userId = `user-${deptKey}`;
     const user = {
       id: userId,
-      name: name,
+      name: name.trim(),
       role: 'DATA_ENTRY' as const,
       organizationId: 'local-org-id',
-      organizationName: department,
+      organizationName: department.trim(),
     };
     localStorage.setItem('attribute3_local_user', JSON.stringify(user));
+    localStorage.removeItem('attribute3_current_values');
     return { success: true, token: 'local-token', user };
   }
 
@@ -139,30 +145,30 @@ class LocalApiClient {
 
   async getCurrentSubmission() {
     const user = this.getLocalUser();
+    const deptKey = this.getDeptKey(user?.organizationName);
     const subs = this.getSubmissionsData();
-    const subList = Object.values(subs)
-      .filter((s: any) => s.userId === user?.id)
-      .sort(
-        (a: any, b: any) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
-      );
 
-    let current: any = subList[0];
+    // Department-scoped submission ensures complete isolation between departments
+    let current: any = subs[deptKey];
 
     if (!current) {
       current = {
-        id: `sub-${user?.id || 'anon'}-${Date.now()}`,
+        id: `sub-${deptKey}`,
+        deptKey,
         userId: user?.id,
+        userName: user?.name,
+        department: user?.organizationName,
         status: 'DRAFT',
         values: [],
         documents: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      subs[current.id] = current;
+      subs[deptKey] = current;
       this.saveSubmissionsData(subs);
     }
 
-    // Sync documents with proofStorage (IndexedDB) to ensure images and links are never lost
+    // Sync documents with proofStorage (IndexedDB) for this submission's attached documents only
     try {
       await proofStorage.purgeDemoProofs();
       if (current.documents && current.documents.length > 0) {
@@ -194,14 +200,29 @@ class LocalApiClient {
   }
 
   async saveDraft(id: string, values: any[]) {
+    const user = this.getLocalUser();
+    const deptKey = this.getDeptKey(user?.organizationName);
     const subs = this.getSubmissionsData();
-    if (!subs[id]) {
-      subs[id] = { id, status: 'DRAFT', values: [], documents: [] };
+    const targetKey = subs[deptKey] ? deptKey : (subs[id] ? id : deptKey);
+
+    if (!subs[targetKey]) {
+      subs[targetKey] = {
+        id: `sub-${deptKey}`,
+        deptKey,
+        userId: user?.id,
+        userName: user?.name,
+        department: user?.organizationName,
+        status: 'DRAFT',
+        values: [],
+        documents: [],
+      };
     }
+
+    const targetSub = subs[targetKey];
 
     // Merge values by fieldCode_yearCode to preserve values across all sections
     const valMap = new Map<string, any>();
-    (subs[id].values || []).forEach((v: any) => {
+    (targetSub.values || []).forEach((v: any) => {
       const fCode = v.fieldCode || v.field?.code;
       const yCode = v.yearCode || v.year?.code;
       if (fCode && yCode) {
@@ -223,15 +244,31 @@ class LocalApiClient {
     });
 
     const mergedValues = Array.from(valMap.values());
-    subs[id].values = mergedValues;
-    subs[id].updatedAt = new Date().toISOString();
+    targetSub.values = mergedValues;
+    targetSub.updatedAt = new Date().toISOString();
     this.saveSubmissionsData(subs);
 
-    // Also persist directly into standalone key for instant fallback recovery
-    localStorage.setItem('attribute3_current_values', JSON.stringify(mergedValues));
+    // Purge any old global key to prevent inter-department data bleed
+    localStorage.removeItem('attribute3_current_values');
 
-    const progress = this.computeProgress(subs[id]);
+    const progress = this.computeProgress(targetSub);
     return { success: true, savedAt: new Date().toISOString(), progress };
+  }
+
+  async clearCurrentDepartmentData() {
+    const user = this.getLocalUser();
+    if (!user) return { success: false };
+    const deptKey = this.getDeptKey(user.organizationName);
+    const subs = this.getSubmissionsData();
+    if (subs[deptKey]) {
+      subs[deptKey].values = [];
+      subs[deptKey].documents = [];
+      subs[deptKey].status = 'DRAFT';
+      subs[deptKey].updatedAt = new Date().toISOString();
+      this.saveSubmissionsData(subs);
+    }
+    localStorage.removeItem('attribute3_current_values');
+    return { success: true };
   }
 
   // Pre-fill all 5 sections with realistic NAAC baseline audit metrics in 1 click
@@ -378,11 +415,12 @@ class LocalApiClient {
 
   // Submit flow
   async submitForReview(id: string) {
-    const subs = this.getSubmissionsData();
-    if (!subs[id]) throw new Error('Submission not found');
-
-    const sub = subs[id];
     const user = this.getLocalUser();
+    const deptKey = this.getDeptKey(user?.organizationName);
+    const subs = this.getSubmissionsData();
+    const sub = subs[deptKey] || subs[id];
+    if (!sub) throw new Error('Submission not found');
+
     const adminEmail = 'datacollection0709@gmail.com';
 
     // Retrieve full documents with images from proofStorage for attached documents only
@@ -423,7 +461,8 @@ class LocalApiClient {
 
     // Generate the official Excel workbook report with embedded photos and links
     let excelBlob: Blob | null = null;
-    let excelFileName = 'Resource_Survey_Report.xlsx';
+    let excelFileName = `Resource_Survey_${(user?.organizationName || 'Department').replace(/[^a-zA-Z0-9_-]/g, '_')}_Report.xlsx`;
+    let excelBase64 = '';
     try {
       const res = await ExcelService.generateAttribute3WorkbookBlob(
         sub.values,
@@ -433,11 +472,70 @@ class LocalApiClient {
       );
       excelBlob = res.blob;
       excelFileName = res.fileName;
+
+      if (excelBlob) {
+        excelBase64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const r = reader.result as string;
+            resolve(r.includes('base64,') ? r.split('base64,')[1] : r);
+          };
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(excelBlob!);
+        });
+      }
     } catch (e) {
-      console.warn('Workbook blob generation error:', e);
+      console.warn('Workbook generation error:', e);
     }
 
-    // 1. Dispatch email via FormSubmit with the REAL .xlsx file ATTACHED!
+    // Upload the complete generated .xlsx workbook directly into Google Drive Proofs folder
+    let driveExcelUrl = '';
+    if (excelBase64) {
+      try {
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'uploadFile',
+            fileName: excelFileName,
+            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            base64Data: excelBase64,
+            googleScriptUrl: this.getGoogleScriptUrl(),
+            userName: user?.name || 'Institutional Officer',
+            department: user?.organizationName || 'Department',
+          }),
+        });
+        const uploadJson = await uploadRes.json();
+        if (uploadJson?.fileUrl) {
+          driveExcelUrl = uploadJson.fileUrl;
+        }
+      } catch (uploadErr) {
+        // Direct Apps Script fallback if /api/upload is unreachable
+        const gUrl = this.getGoogleScriptUrl();
+        if (gUrl) {
+          try {
+            const gRes = await fetch(gUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({
+                action: 'uploadFile',
+                fileName: excelFileName,
+                mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                base64Data: excelBase64,
+                userName: user?.name || 'Institutional Officer',
+                department: user?.organizationName || 'Department',
+              }),
+            });
+            const gJson = await gRes.json();
+            if (gJson?.fileUrl) {
+              driveExcelUrl = gJson.fileUrl;
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    // 1. Dispatch email via FormSubmit with summary AND direct Google Drive link to Excel workbook
     try {
       const emailFormData = new FormData();
       if (excelBlob) {
@@ -448,8 +546,16 @@ class LocalApiClient {
       emailFormData.append('Department', user?.organizationName || 'Academic Department');
       emailFormData.append('Total_Answered_Entries', String(filledValues.length));
       emailFormData.append('Attached_Proofs_Count', String(fullDocs.length));
+      if (driveExcelUrl) {
+        emailFormData.append('Google_Drive_Excel_Report', driveExcelUrl);
+      }
       emailFormData.append('Proofs_and_Links', proofsListText);
-      emailFormData.append('Message', 'Attached is your official Resource Survey Institutional Excel report (.xlsx) containing all answered indicators, calculations, and embedded photo evidence.');
+      emailFormData.append(
+        'Message',
+        driveExcelUrl
+          ? `The official institutional Excel report (.xlsx) has been generated and uploaded to Google Drive:\n${driveExcelUrl}\n\nPlease click the link above to view or download the complete workbook.`
+          : 'The official institutional Excel report (.xlsx) has been generated and downloaded.'
+      );
       emailFormData.append('Summary_Data', summaryLines);
 
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://datacollector.vercel.app';
@@ -470,19 +576,6 @@ class LocalApiClient {
 
     // 2. Dispatch to Vercel Serverless Function /api/submit
     try {
-      let excelBase64 = '';
-      if (excelBlob) {
-        excelBase64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const res = reader.result as string;
-            resolve(res.includes('base64,') ? res.split('base64,')[1] : res);
-          };
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(excelBlob!);
-        });
-      }
-
       await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -492,6 +585,7 @@ class LocalApiClient {
           department: user?.organizationName || 'Department',
           submissionData: sub.values,
           documents: fullDocs,
+          driveExcelUrl,
           excelBase64,
           excelFileName,
         }),
@@ -527,17 +621,19 @@ class LocalApiClient {
       `Department: ${user?.organizationName || 'Academic Department'}\n` +
       `Total Answered Entries: ${filledValues.length}\n` +
       `Attached Proofs: ${fullDocs.length}\n\n` +
+      (driveExcelUrl ? `Official Excel Workbook (Google Drive): ${driveExcelUrl}\n\n` : '') +
       `--- ATTACHED PROOFS & LINKS ---\n` +
       `${proofsListText}\n\n` +
       `--- INDICATORS SUMMARY ---\n` +
       `${summaryLines}\n\n` +
-      `Note: The full institutional Excel report (.xlsx) with embedded photos has been generated and downloaded.`
+      `Note: The full institutional Excel report (.xlsx) with embedded evidence has been generated and downloaded.`
     );
     const mailtoUrl = `mailto:${adminEmail}?subject=${mailtoSubject}&body=${mailtoBody}`;
 
     return {
       success: true,
-      message: `Submission successfully recorded and dispatched to ${adminEmail}!`,
+      message: `Submission successfully recorded and Excel report uploaded to Google Drive!`,
+      driveExcelUrl,
       mailtoUrl,
       submission: sub,
     };
@@ -816,13 +912,14 @@ class LocalApiClient {
 
   async downloadExcel(submissionId?: string, filename = 'Resource_Survey_Report.xlsx') {
     const user = this.getLocalUser();
+    const deptKey = this.getDeptKey(user?.organizationName);
     const subs = this.getSubmissionsData();
-    let sub = submissionId ? subs[submissionId] : null;
+    let sub = subs[deptKey] || (submissionId ? subs[submissionId] : null);
 
     // If sub not found by ID, locate the active submission for current logged in user
     if (!sub && user?.id) {
       const userSubs = Object.values(subs)
-        .filter((s: any) => s.userId === user.id)
+        .filter((s: any) => s.userId === user.id || s.deptKey === deptKey)
         .sort((a: any, b: any) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
       if (userSubs.length > 0) {
         sub = userSubs[0];
@@ -830,7 +927,7 @@ class LocalApiClient {
     }
 
     if (!sub) {
-      sub = { id: submissionId || 'default', values: [], documents: [] };
+      sub = { id: submissionId || `sub-${deptKey}`, values: [], documents: [] };
     }
 
     const valuesToUse = sub.values || [];

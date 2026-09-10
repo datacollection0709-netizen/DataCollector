@@ -45,6 +45,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [mailtoUrl, setMailtoUrl] = useState<string | null>(null);
+  const [driveExcelUrl, setDriveExcelUrl] = useState<string | null>(null);
 
   useEffect(() => {
     onRefreshSubmission();
@@ -54,20 +55,14 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
     setCollapsedSections((prev) => ({ ...prev, [code]: !prev[code] }));
   };
 
-  // Map values with multi-source fallback, prioritizing freshest localStorage
+  // Map values strictly from current department's submission (ZERO fallback to other departments)
   const valueMap = new Map<string, any>();
+  const user = api.getLocalUser();
+  const deptKey = api.getDeptKey(user?.organizationName);
   const subsStr = localStorage.getItem('attribute3_submissions');
   const subs = subsStr ? JSON.parse(subsStr) : {};
-  let valuesSource = (submission?.id && subs[submission.id]?.values) || submission?.values || [];
-  if (valuesSource.length === 0) {
-    const raw = localStorage.getItem('attribute3_current_values');
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        valuesSource = Array.isArray(parsed) ? parsed : Object.values(parsed);
-      } catch (e) {}
-    }
-  }
+  const targetSub = subs[deptKey] || (submission?.id && subs[submission.id]) || submission;
+  const valuesSource = targetSub?.values || [];
 
   for (const v of valuesSource) {
     if (!v) continue;
@@ -78,9 +73,9 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
     }
   }
 
-  // Map docs
+  // Map docs strictly from current department's submission
   const docMap = new Map<string, any[]>();
-  const activeDocs = (submission?.id && subs[submission.id]?.documents) || submission?.documents || [];
+  const activeDocs = targetSub?.documents || [];
   for (const d of activeDocs) {
     const fCode = d.field?.code || d.fieldCode;
     if (!fCode) continue;
@@ -95,8 +90,11 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await api.submitForReview(submission.id);
+      const res = await api.submitForReview(submission?.id);
       setSubmitSuccess(true);
+      if (res.driveExcelUrl) {
+        setDriveExcelUrl(res.driveExcelUrl);
+      }
       if (res.mailtoUrl) {
         setMailtoUrl(res.mailtoUrl);
       }
@@ -156,6 +154,17 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 Submitted & Excel Downloaded!
               </span>
+              {driveExcelUrl && (
+                <a
+                  href={driveExcelUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors flex items-center gap-1.5"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open Excel in Google Drive</span>
+                </a>
+              )}
               {mailtoUrl && (
                 <a
                   href={mailtoUrl}
