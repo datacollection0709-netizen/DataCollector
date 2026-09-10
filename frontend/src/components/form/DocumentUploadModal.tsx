@@ -34,7 +34,7 @@ interface DocumentUploadModalProps {
   onDocumentChange: () => void;
 }
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB limit
+const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB limit
 const MAX_PROOFS_PER_FIELD = 3;
 
 // Official Google Drive Triangular Logo
@@ -117,7 +117,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
     if (file.size > MAX_FILE_SIZE_BYTES) {
       const currentMb = (file.size / (1024 * 1024)).toFixed(1);
-      setErrorMsg(`File size exceeds 10 MB limit (Current: ${currentMb} MB).`);
+      setErrorMsg(`File size exceeds 2 MB limit (Current: ${currentMb} MB).`);
       return;
     }
 
@@ -271,7 +271,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
               <span>
-                Files upload directly into Google Drive folder <strong>Proofs</strong> (datacollection0709@gmail.com). Max 10 MB per file.
+                Files upload directly into Google Drive folder <strong>Proofs</strong> (datacollection0709@gmail.com). Max 2 MB per file.
               </span>
             </div>
 
