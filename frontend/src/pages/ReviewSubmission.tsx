@@ -12,7 +12,6 @@ import {
   FileText,
   AlertCircle,
   Download,
-  Mail,
   ExternalLink,
   Image as ImageIcon,
 } from 'lucide-react';
@@ -44,8 +43,6 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [mailtoUrl, setMailtoUrl] = useState<string | null>(null);
-  const [driveExcelUrl, setDriveExcelUrl] = useState<string | null>(null);
 
   useEffect(() => {
     onRefreshSubmission();
@@ -90,14 +87,8 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await api.submitForReview(submission?.id);
+      await api.submitForReview(submission?.id);
       setSubmitSuccess(true);
-      if (res.driveExcelUrl) {
-        setDriveExcelUrl(res.driveExcelUrl);
-      }
-      if (res.mailtoUrl) {
-        setMailtoUrl(res.mailtoUrl);
-      }
       onRefreshSubmission();
     } catch (err: any) {
       setSubmitError(err.message || 'Failed to submit form.');
@@ -154,28 +145,6 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                 Submitted & Excel Downloaded!
               </span>
-              {driveExcelUrl && (
-                <a
-                  href={driveExcelUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition-colors flex items-center gap-1.5"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Open Excel in Google Drive</span>
-                </a>
-              )}
-              {mailtoUrl && (
-                <a
-                  href={mailtoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors flex items-center gap-1.5"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Open in Gmail (Direct Send)</span>
-                </a>
-              )}
             </div>
           )}
 
