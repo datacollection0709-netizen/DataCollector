@@ -36,10 +36,10 @@ export const Login: React.FC = () => {
           <Building2 className="w-8 h-8" />
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-white">
-          Attribute 3 Portal
+          Resource Survey Portal
         </h2>
         <p className="mt-1 text-sm text-slate-400">
-          Institutional Data Collection & NAAC Infrastructure Audit System
+          Institutional Data Collection & Infrastructure Audit System
         </p>
       </div>
 

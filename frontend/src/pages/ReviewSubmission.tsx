@@ -117,7 +117,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
 
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Attribute 3: Comprehensive Review
+              Resource Survey: Comprehensive Review
             </h1>
             <p className="text-xs text-slate-500 mt-1">
               Verify all metrics, in-cell photo evidence (max 2 MB), and Drive links across 2023–24, 2024–25, and 2025–26.

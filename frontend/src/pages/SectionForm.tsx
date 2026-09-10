@@ -175,23 +175,6 @@ export const SectionForm: React.FC<SectionFormProps> = ({
     }
   };
 
-  // 1-Click Auto-Fill for ALL 5 Sections
-  const handleAutoFillAllSections = async () => {
-    if (!submission?.id) return;
-    setIsPreFilling(true);
-    try {
-      await api.prefillAllSections(submission.id);
-      onRefreshSubmission();
-      setLastSavedTime(
-        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      );
-    } catch (e: any) {
-      alert('Pre-fill error: ' + e.message);
-    } finally {
-      setIsPreFilling(false);
-    }
-  };
-
   const sectionCodes = ['3.1', '3.2', '3.3', '3.4', '3.5'];
   const currentIndex = sectionCodes.indexOf(sectionCode);
   const prevCode = currentIndex > 0 ? sectionCodes[currentIndex - 1] : null;
@@ -334,22 +317,6 @@ export const SectionForm: React.FC<SectionFormProps> = ({
 
           {/* Action Toolbar */}
           <div className="flex items-center gap-2 self-end lg:self-auto flex-wrap justify-end">
-            {/* 1-Click Auto-Fill ALL Sections */}
-            <button
-              type="button"
-              onClick={handleAutoFillAllSections}
-              disabled={isPreFilling}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition-all shadow-sm disabled:opacity-50"
-              title="Instantly pre-fill all 5 sections with realistic NAAC metrics & photos"
-            >
-              {isPreFilling ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
-              ) : (
-                <Zap className="w-3.5 h-3.5 text-yellow-300" />
-              )}
-              <span>{isPreFilling ? 'Populating...' : '⚡ 1-Click Auto-Fill (All Sections)'}</span>
-            </button>
-
 
             {nextCode ? (
               <Button variant="primary" size="sm" onClick={handleNext} rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>

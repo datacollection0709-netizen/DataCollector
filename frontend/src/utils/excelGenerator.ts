@@ -4,7 +4,7 @@ import { attribute3Schema } from './schema';
 
 export class ExcelService {
   /**
-   * Generates the complete Attribute 3 Excel workbook as a Blob and ArrayBuffer
+   * Generates the complete Resource Survey Excel workbook as a Blob and ArrayBuffer
    * containing in-cell photos, clickable hyperlinks, and a high-resolution Visual Evidence sheet.
    */
   static async generateAttribute3WorkbookBlob(
@@ -14,7 +14,7 @@ export class ExcelService {
     documents: any[] = []
   ): Promise<{ blob: Blob; buffer: ArrayBuffer; fileName: string }> {
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'Attribute 3 Institutional System';
+    workbook.creator = 'Resource Survey Institutional System';
     workbook.lastModifiedBy = userName || 'Institutional Auditor';
     workbook.created = new Date();
     workbook.modified = new Date();
@@ -141,7 +141,7 @@ export class ExcelService {
     ];
 
     summarySheet.addRow([]);
-    const titleRow = summarySheet.addRow(['', 'ATTRIBUTE 3: INSTITUTIONAL REPORT', '', '']);
+    const titleRow = summarySheet.addRow(['', 'RESOURCE SURVEY: INSTITUTIONAL REPORT', '', '']);
     titleRow.getCell(2).font = titleFont;
 
     const subTitleRow = summarySheet.addRow(['', 'Infrastructure and Learning Resources Data Collection & NAAC Audit', '', '']);

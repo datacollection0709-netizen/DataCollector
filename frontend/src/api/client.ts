@@ -132,7 +132,7 @@ class LocalApiClient {
       id: sub.id,
       status: sub.status,
       updatedAt: sub.updatedAt,
-      attribute: { title: 'Attribute 3: Infrastructure and Learning Resources' },
+      attribute: { title: 'Resource Survey: Infrastructure and Learning Resources' },
     }));
     return { success: true, submissions: list };
   }
@@ -463,13 +463,13 @@ class LocalApiClient {
       if (excelBlob) {
         emailFormData.append('attachment', excelBlob, excelFileName);
       }
-      emailFormData.append('_subject', `Attribute 3 Institutional Excel Report: ${user?.name || 'Officer'} (${user?.organizationName || 'Dept'})`);
+      emailFormData.append('_subject', `Resource Survey Institutional Excel Report: ${user?.name || 'Officer'} (${user?.organizationName || 'Dept'})`);
       emailFormData.append('Submitter_Name', user?.name || 'Institutional Officer');
       emailFormData.append('Department', user?.organizationName || 'Academic Department');
       emailFormData.append('Total_Answered_Entries', String(filledValues.length));
       emailFormData.append('Attached_Proofs_Count', String(fullDocs.length));
       emailFormData.append('Proofs_and_Links', proofsListText);
-      emailFormData.append('Message', 'Attached is your official Attribute 3 Institutional Excel report (.xlsx) containing all answered indicators, calculations, and embedded photo evidence.');
+      emailFormData.append('Message', 'Attached is your official Resource Survey Institutional Excel report (.xlsx) containing all answered indicators, calculations, and embedded photo evidence.');
       emailFormData.append('Summary_Data', summaryLines);
 
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://datacollector.vercel.app';
@@ -539,10 +539,10 @@ class LocalApiClient {
 
     // Generate direct mailto link as instant fallback
     const mailtoSubject = encodeURIComponent(
-      `Attribute 3 Audit Submission - ${user?.name || 'Institutional Officer'} (${user?.organizationName || 'Dept'})`
+      `Resource Survey Audit Submission - ${user?.name || 'Institutional Officer'} (${user?.organizationName || 'Dept'})`
     );
     const mailtoBody = encodeURIComponent(
-      `Official Attribute 3 Institutional Data Submission\n\n` +
+      `Official Resource Survey Institutional Data Submission\n\n` +
       `Submitter: ${user?.name || 'Institutional Officer'}\n` +
       `Department: ${user?.organizationName || 'Academic Department'}\n` +
       `Total Answered Entries: ${filledValues.length}\n` +
@@ -667,7 +667,7 @@ class LocalApiClient {
           base64Data,
           googleScriptUrl,
           userName: user?.name || 'Institutional Officer',
-          department: user?.organizationName || 'Attribute 3',
+          department: user?.organizationName || 'Resource Survey',
         }),
       });
       const proxyJson = await proxyRes.json();
@@ -692,7 +692,7 @@ class LocalApiClient {
               mimeType: file.type || 'application/octet-stream',
               base64Data,
               userName: user?.name || 'Institutional Officer',
-              department: user?.organizationName || 'Attribute 3',
+              department: user?.organizationName || 'Resource Survey',
             }),
           });
           const gJson = await gRes.json();

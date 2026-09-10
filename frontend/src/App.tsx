@@ -41,7 +41,7 @@ export const App: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Data initialization error:', err);
-      setErrorMsg(err.message || 'Failed to initialize Attribute 3 data.');
+      setErrorMsg(err.message || 'Failed to initialize Resource Survey data.');
     } finally {
       setAppLoading(false);
     }
@@ -83,7 +83,7 @@ export const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-slate-700 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
-        <p className="text-sm font-medium text-slate-600">Loading Attribute 3 Workbooks & Config...</p>
+        <p className="text-sm font-medium text-slate-600">Loading Resource Survey Workbooks & Config...</p>
       </div>
     );
   }

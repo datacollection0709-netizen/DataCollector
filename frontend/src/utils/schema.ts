@@ -3,7 +3,7 @@ export const attribute3Schema = {
   attribute: {
     id: 'attr-3',
     code: '3',
-    title: 'Attribute 3: Infrastructure and Learning Resources',
+    title: 'Resource Survey: Infrastructure and Learning Resources',
     description: 'Physical facilities, library expenditure, research software, IT infrastructure, and inclusive campus environment.',
     version: 1,
     active: true,

@@ -77,7 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
         <div className="flex items-center justify-between mb-2 mt-1">
           <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-            Attribute 3 Progress
+            Resource Survey Progress
           </span>
           <span
             className={`text-xs font-bold px-2 py-0.5 rounded-full ${
@@ -190,17 +190,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       </nav>
 
-      {/* Export to Excel Button in Sidebar Footer */}
-      <div className="p-3 border-t border-slate-200">
-        <button
-          type="button"
-          onClick={onExportExcel}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors shadow-sm"
-        >
-          <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-          <span>Export Excel Report</span>
-        </button>
-      </div>
     </aside>
   );
 };
