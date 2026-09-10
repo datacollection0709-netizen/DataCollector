@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   Building2,
   BookOpen,
@@ -6,7 +5,6 @@ import {
   Wifi,
   Accessibility,
   CheckCircle2,
-  FileSpreadsheet,
   ArrowRight,
 } from 'lucide-react';
 import { ProgressBar } from '../components/ui/ProgressBar';
@@ -17,14 +15,12 @@ interface DashboardProps {
   progress: any;
   onNavigateSection: (sectionCode: string) => void;
   onNavigateReview: () => void;
-  onExportExcel: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
   progress,
   onNavigateSection,
   onNavigateReview,
-  onExportExcel,
 }) => {
   const sectionsMeta = [
     {
@@ -85,7 +81,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-700">Completion</span>
             </div>
-            <span className="text-xs font-bold text-slate-900 font-mono">{overall}%</span>
+            <span className="text-xs font-bold text-slate-900 tabular-nums">{overall}%</span>
           </div>
           <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
             <div

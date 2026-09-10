@@ -7,6 +7,7 @@ import {
   ExternalLink,
   CheckCircle2,
   AlertCircle,
+  Upload,
 } from 'lucide-react';
 import { api } from '../../api/client';
 
@@ -36,45 +37,6 @@ interface DocumentUploadModalProps {
 
 const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB limit
 const MAX_PROOFS_PER_FIELD = 3;
-
-// Official Google Drive Triangular Logo
-const GoogleDriveLogo = () => (
-  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
-    <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" />
-    <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44c-.8 1.4-1.2 2.95-1.2 4.5h27.5z" fill="#00ac47" />
-    <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" />
-    <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d" />
-    <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc" />
-    <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" />
-  </svg>
-);
-
-// Green-to-Blue Gradient Cloud Illustration with Upward Arrow
-const GoogleCloudUploadIllustration = () => (
-  <svg width="140" height="90" viewBox="0 0 150 98" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-3">
-    <defs>
-      <linearGradient id="cloudGreenBlue" x1="10%" y1="60%" x2="90%" y2="40%">
-        <stop offset="0%" stopColor="#4ADE80" />
-        <stop offset="50%" stopColor="#6EE7B7" />
-        <stop offset="100%" stopColor="#93C5FD" />
-      </linearGradient>
-    </defs>
-    <path
-      d="M110 44C108 28 94 16 77 16C63 16 51 24 46 36C41 33 35 31 29 31C15 31 3.5 42.5 3.5 56.5C3.5 70.5 15 82 29 82H112C126 82 137.5 70.5 137.5 56.5C137.5 43.5 126 33 113 33C112 33 111 33.3 110 33.7"
-      fill="url(#cloudGreenBlue)"
-      stroke="#1E293B"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    />
-    <path
-      d="M74 70V44M74 44L61 57M74 44L87 57"
-      stroke="#1E293B"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   isOpen,
@@ -150,13 +112,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
       formData.append('dataUrl', dataUrl);
 
       await api.uploadDocument(formData);
-      setSuccessMsg(`"${file.name}" uploaded directly to Google Drive folder "Proofs" and linked!`);
+      setSuccessMsg(`"${file.name}" attached successfully.`);
       onDocumentChange();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to upload document to Google Drive.');
+      setErrorMsg(err.message || 'Failed to upload document.');
     } finally {
       setIsUploading(false);
     }
@@ -200,30 +162,21 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
         onClick={onClose}
       />
 
-      {/* Modal Dialog Styled as Official Google Drive Insert File */}
+      {/* Modal Dialog Styled as Enterprise File Attachment */}
       <div className="flex min-h-full items-center justify-center p-3 sm:p-4 text-center">
         <div
-          className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl border border-slate-200"
+          className="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-xl border border-slate-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Top Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <GoogleDriveLogo />
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-[17px] font-semibold text-slate-800 tracking-tight">
-                    Insert file
-                  </h2>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Drive Connected
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 truncate max-w-sm">
-                  {fieldCode} • {fieldLabel}
-                </p>
-              </div>
+            <div>
+              <h2 className="text-base font-semibold text-slate-900 tracking-tight">
+                Attach Supporting Document
+              </h2>
+              <p className="text-xs text-slate-500 truncate max-w-sm mt-0.5">
+                {fieldCode} — {fieldLabel}
+              </p>
             </div>
 
             <button
@@ -267,15 +220,15 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               </div>
             )}
 
-            {/* Folder storage info */}
+            {/* Clean storage specification */}
             <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 flex-shrink-0" />
               <span>
-                Files upload directly into Google Drive folder <strong>Proofs</strong> (datacollection0709@gmail.com). Max 2 MB per file.
+                Supported file formats: PDF, PNG, JPG, WEBP. Maximum file size: 2 MB.
               </span>
             </div>
 
-            {/* Upload Zone */}
+            {/* Upload Drop Zone */}
             <div
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
@@ -283,8 +236,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               onDrop={handleDrop}
               className={`relative border-2 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all ${
                 dragActive
-                  ? 'border-[#1a73e8] bg-blue-50/50 scale-[1.005]'
-                  : 'border-slate-300 bg-slate-50/30 hover:bg-slate-50/70 hover:border-slate-400'
+                  ? 'border-brand-500 bg-brand-50/50 scale-[1.005]'
+                  : 'border-slate-300 bg-slate-50/40 hover:bg-slate-50/80 hover:border-slate-400'
               }`}
             >
               <input
@@ -294,15 +247,17 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                 onChange={(e) => handleFiles(e.target.files)}
                 disabled={isUploading || isLimitReached}
                 className="hidden"
-                id="gdrive-file-input"
+                id="doc-file-input"
               />
 
-              <GoogleCloudUploadIllustration />
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 mb-3 shadow-2xs">
+                <Upload className="w-5 h-5 text-slate-600" />
+              </div>
 
               {isUploading ? (
-                <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-blue-500 text-white font-medium text-xs shadow-md">
+                <div className="flex items-center gap-2.5 px-5 py-2.5 rounded-full bg-brand-600 text-white font-medium text-xs shadow-md">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Uploading to Drive...</span>
+                  <span>Uploading file...</span>
                 </div>
               ) : isLimitReached ? (
                 <div className="text-center">
@@ -316,13 +271,13 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
               ) : (
                 <>
                   <label
-                    htmlFor="gdrive-file-input"
-                    className="cursor-pointer inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-semibold shadow-md transition-colors select-none"
+                    htmlFor="doc-file-input"
+                    className="cursor-pointer inline-flex items-center justify-center px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors select-none"
                   >
-                    Browse
+                    Select File
                   </label>
-                  <p className="text-xs text-slate-500 mt-2.5">
-                    or drag a file to upload directly to Google Drive
+                  <p className="text-xs text-slate-500 mt-2">
+                    or drag and drop file here
                   </p>
                 </>
               )}
@@ -332,8 +287,8 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
             {fieldDocs.length > 0 && (
               <div className="pt-2">
                 <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-2">
-                  <span>Selected Files for {fieldCode}</span>
-                  <span className="text-[11px] text-slate-400 font-mono">
+                  <span>Attached Documents</span>
+                  <span className="text-[11px] text-slate-400 font-medium">
                     {fieldDocs.length} / {MAX_PROOFS_PER_FIELD} attached
                   </span>
                 </div>
@@ -352,7 +307,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                         className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-2xs"
                       >
                         <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
-                          <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
                             <FileText className="w-4 h-4" />
                           </div>
                           <div className="min-w-0">
@@ -362,7 +317,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                             <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
                               <span>{sizeFormatted}</span>
                               <span>•</span>
-                              <span className="text-emerald-700 font-medium">Google Drive Proof</span>
+                              <span className="text-slate-600 font-medium">Attached</span>
                             </div>
                           </div>
                         </div>
@@ -373,9 +328,9 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
                               href={driveUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-brand-700 bg-brand-50 hover:bg-brand-100 transition-colors"
                             >
-                              <span>Open in Drive</span>
+                              <span>View File</span>
                               <ExternalLink className="w-3.5 h-3.5" />
                             </a>
                           )}

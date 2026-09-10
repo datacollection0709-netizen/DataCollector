@@ -62,40 +62,44 @@ export const SectionForm: React.FC<SectionFormProps> = ({
   const isDirtyRef = useRef<boolean>(false);
   const refreshTimerRef = useRef<any>(null);
 
-  // Initialize form data on mount or when section changes
+  // Initialize form data on mount, sectionCode change, or submission change
   useEffect(() => {
-    if (submission?.values) {
-      const initial: Record<string, any> = {};
-      for (const val of submission.values) {
-        const fCode = val.field?.code || val.fieldCode;
-        const yCode = val.year?.code || val.yearCode;
-        if (!fCode || !yCode) continue;
-        const key = `${fCode}_${yCode}`;
-        initial[key] = {
-          fieldCode: fCode,
-          yearCode: yCode,
-          isNotApplicable: val.isNotApplicable,
-          numericValue: val.numericValue,
-          textValue: val.textValue,
-          ratioNumerator: val.ratioNumerator,
-          ratioDenominator: val.ratioDenominator,
-          remarks: val.remarks,
-        };
-      }
-      setFormData(initial);
-      formDataRef.current = initial;
-      isDirtyRef.current = false;
-      setIsDirty(false);
+    // Read freshest values from localStorage first, then fallback to prop
+    const subsStr = localStorage.getItem('attribute3_submissions');
+    const subs = subsStr ? JSON.parse(subsStr) : {};
+    const freshestValues = (submission?.id && subs[submission.id]?.values) || submission?.values || [];
+
+    const initial: Record<string, any> = {};
+    for (const val of freshestValues) {
+      const fCode = val.field?.code || val.fieldCode;
+      const yCode = val.year?.code || val.yearCode;
+      if (!fCode || !yCode) continue;
+      const key = `${fCode}_${yCode}`;
+      initial[key] = {
+        fieldCode: fCode,
+        yearCode: yCode,
+        isNotApplicable: val.isNotApplicable,
+        numericValue: val.numericValue,
+        textValue: val.textValue,
+        ratioNumerator: val.ratioNumerator,
+        ratioDenominator: val.ratioDenominator,
+        remarks: val.remarks,
+      };
     }
-  }, [sectionCode, submission?.id]);
+    setFormData(initial);
+    formDataRef.current = initial;
+    isDirtyRef.current = false;
+    setIsDirty(false);
+  }, [sectionCode, submission?.id, submission?.updatedAt]);
 
   // Flush save on unmount or section switch
   useEffect(() => {
     return () => {
       if (isDirtyRef.current && submission?.id) {
-        const payloadValues = Object.values(formDataRef.current);
-        if (payloadValues.length > 0) {
-          api.saveDraft(submission.id, payloadValues);
+        const currentSectionFields = new Set((section?.fields || []).map((f: any) => f.code));
+        const sectionValues = Object.values(formDataRef.current).filter((v: any) => currentSectionFields.has(v.fieldCode));
+        if (sectionValues.length > 0) {
+          api.saveDraft(submission.id, sectionValues);
           onRefreshSubmission();
         }
       }
@@ -134,9 +138,11 @@ export const SectionForm: React.FC<SectionFormProps> = ({
     setFormData(nextData);
     setIsDirty(true);
 
-    // Persist synchronously to localStorage
+    // Persist synchronously to localStorage for current section fields only
     if (submission?.id) {
-      api.saveDraft(submission.id, Object.values(nextData));
+      const currentSectionFields = new Set((section?.fields || []).map((f: any) => f.code));
+      const sectionValues = Object.values(nextData).filter((v: any) => currentSectionFields.has(v.fieldCode));
+      api.saveDraft(submission.id, sectionValues);
     }
 
     if (refreshTimerRef.current) {
@@ -182,8 +188,10 @@ export const SectionForm: React.FC<SectionFormProps> = ({
 
   const handleNext = async () => {
     if (submission?.id) {
-      await api.saveDraft(submission.id, Object.values(formDataRef.current));
-      onRefreshSubmission();
+      const currentSectionFields = new Set((section?.fields || []).map((f: any) => f.code));
+      const sectionValues = Object.values(formDataRef.current).filter((v: any) => currentSectionFields.has(v.fieldCode));
+      await api.saveDraft(submission.id, sectionValues);
+      await onRefreshSubmission();
     }
     if (nextCode) {
       onNavigateSection(nextCode);
@@ -194,23 +202,13 @@ export const SectionForm: React.FC<SectionFormProps> = ({
 
   const handlePrev = async () => {
     if (submission?.id) {
-      await api.saveDraft(submission.id, Object.values(formDataRef.current));
-      onRefreshSubmission();
+      const currentSectionFields = new Set((section?.fields || []).map((f: any) => f.code));
+      const sectionValues = Object.values(formDataRef.current).filter((v: any) => currentSectionFields.has(v.fieldCode));
+      await api.saveDraft(submission.id, sectionValues);
+      await onRefreshSubmission();
     }
     if (prevCode) {
       onNavigateSection(prevCode);
-    }
-  };
-
-  const handleQuickDownloadExcel = async () => {
-    try {
-      if (submission?.id) {
-        await api.saveDraft(submission.id, Object.values(formDataRef.current));
-        onRefreshSubmission();
-      }
-      await api.downloadExcel(submission?.id);
-    } catch (err: any) {
-      alert('Download error: ' + err.message);
     }
   };
 
@@ -267,7 +265,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                   : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
               }`}
             >
-              <span className={`font-mono font-bold ${isActive ? 'text-white' : 'text-brand-700'}`}>
+              <span className={`tabular-nums font-semibold ${isActive ? 'text-white' : 'text-slate-700'}`}>
                 {code}
               </span>
               <span className="hidden sm:inline">{secMeta?.title?.split(' ')[0]}</span>
@@ -288,31 +286,33 @@ export const SectionForm: React.FC<SectionFormProps> = ({
       {/* Section Header Card */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <span className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 text-white font-mono font-bold text-base flex items-center justify-center shadow-md shadow-brand-500/20 flex-shrink-0">
-              {section.code}
-            </span>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                  {section.title}
-                </h1>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/60">
-                  {completedFieldsCount} of {totalFields} answered
-                </span>
-                {lastSavedTime && (
-                  <span className="text-[11px] text-emerald-600 font-medium flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                    <CheckCircle className="w-3 h-3 text-emerald-500" />
-                    Auto-saved {lastSavedTime}
+          <div>
+            <div className="flex items-center gap-2.5 mb-1 flex-wrap">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Section {section.code}
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs font-medium text-slate-600">
+                {completedFieldsCount} of {totalFields} answered
+              </span>
+              {lastSavedTime && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-[11px] text-emerald-700 font-medium flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                    Saved {lastSavedTime}
                   </span>
-                )}
-              </div>
-              {section.description && (
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-2xl">
-                  {section.description}
-                </p>
+                </>
               )}
             </div>
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+              {section.title}
+            </h1>
+            {section.description && (
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-2xl">
+                {section.description}
+              </p>
+            )}
           </div>
 
           {/* Action Toolbar */}
@@ -335,7 +335,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
           <div className="flex-1 max-w-md">
             <div className="flex justify-between items-center text-xs mb-1.5 font-medium">
               <span className="text-slate-600">Section Completion</span>
-              <span className="text-slate-900 font-bold font-mono">{sectionPercentage}%</span>
+              <span className="text-slate-900 font-semibold tabular-nums">{sectionPercentage}%</span>
             </div>
             <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
               <div
@@ -368,7 +368,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
               >
                 <span>Pending</span>
                 {pendingCount > 0 ? (
-                  <span className="px-1.5 py-0.2 rounded-full bg-brand-100 text-brand-800 text-[10px] font-bold font-mono">
+                  <span className="px-1.5 py-0.2 rounded-full bg-brand-100 text-brand-800 text-[10px] font-semibold tabular-nums">
                     {pendingCount}
                   </span>
                 ) : (
@@ -387,14 +387,14 @@ export const SectionForm: React.FC<SectionFormProps> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
-                  <th className="py-3 px-3 w-16 text-center font-mono">Code</th>
+                  <th className="py-3 px-3 w-16 text-center tabular-nums font-semibold">Code</th>
                   <th className="py-3 px-4 min-w-[240px]">Facility / Indicator</th>
                   {years.map((y) => (
-                    <th key={y.code} className="py-3 px-3 text-center w-36 font-mono font-bold text-slate-700">
+                    <th key={y.code} className="py-3 px-3 text-center w-36 tabular-nums font-semibold text-slate-700">
                       {y.code}
                     </th>
                   ))}
-                  <th className="py-3 px-4 text-center w-48">Proofs, Photos & Links</th>
+                  <th className="py-3 px-4 text-center w-48">Attached Files</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -423,7 +423,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                         }`}
                       >
                         {/* Field Code */}
-                        <td className="py-3 px-3 text-center font-mono font-bold text-brand-700">
+                        <td className="py-3 px-3 text-center tabular-nums font-semibold text-slate-700">
                           {field.code}
                         </td>
 
@@ -452,7 +452,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                           return (
                             <td key={year.code} className="py-2.5 px-2 text-center">
                               {isNA ? (
-                                <div className="py-1.5 px-2 rounded-lg bg-amber-50 text-amber-700 font-mono font-semibold text-xs border border-amber-200">
+                                <div className="py-1.5 px-2 rounded-lg bg-amber-50 text-amber-700 tabular-nums font-semibold text-xs border border-amber-200">
                                   N/A
                                 </div>
                               ) : field.fieldType === 'BOOLEAN' ? (
@@ -533,7 +533,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                                         isNotApplicable: false,
                                       });
                                     }}
-                                    className="w-full py-1.5 px-2 text-right font-mono text-xs font-semibold text-slate-900 border-0 outline-none focus:ring-0"
+                                    className="w-full py-1.5 px-2 text-right tabular-nums text-xs font-medium text-slate-900 border-0 outline-none focus:ring-0"
                                   />
                                   {field.fieldType === 'PERCENTAGE' && (
                                     <span className="pr-2 text-slate-400 font-bold text-xs select-none">%</span>
@@ -556,27 +556,17 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 shadow-2xs'
                                   : 'bg-slate-50 text-slate-500 border border-dashed border-slate-300 hover:border-slate-400 hover:text-slate-700'
                               }`}
-                              title={hasProof ? `${fieldDocs.length} proof(s) attached. Click to manage/open.` : 'Attach photos, PDFs, or Drive links'}
+                              title={hasProof ? `${fieldDocs.length} file(s) attached` : 'Attach supporting files'}
                             >
-                              {photoDocs.length > 0 ? (
-                                <>
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                  <span>📷 {photoDocs.length} Photo{photoDocs.length > 1 ? 's' : ''}</span>
-                                </>
-                              ) : fieldDocs.some((d: any) => d.hyperlink) ? (
-                                <>
-                                  <ExternalLink className="w-3.5 h-3.5 text-brand-600" />
-                                  <span>Drive Link</span>
-                                </>
-                              ) : hasProof ? (
+                              {hasProof ? (
                                 <>
                                   <Paperclip className="w-3.5 h-3.5 text-emerald-600" />
-                                  <span>{fieldDocs.length} Proof{fieldDocs.length > 1 ? 's' : ''}</span>
+                                  <span>{fieldDocs.length} file{fieldDocs.length > 1 ? 's' : ''}</span>
                                 </>
                               ) : (
                                 <>
                                   <Upload className="w-3 h-3 text-slate-400" />
-                                  <span>+ Proof / Link</span>
+                                  <span>+ Attach File</span>
                                 </>
                               )}
                             </button>
@@ -585,7 +575,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
                             <button
                               type="button"
                               onClick={() => handleToggleNA(field)}
-                              className={`px-2 py-1 rounded-lg text-[11px] font-mono font-semibold transition-all border ${
+                              className={`px-2 py-1 rounded-lg text-[11px] tabular-nums font-semibold transition-all border ${
                                 isAllNA
                                   ? 'bg-amber-100 text-amber-800 border-amber-300 shadow-2xs'
                                   : 'bg-white text-slate-400 border-slate-200 hover:text-slate-700 hover:border-slate-300'

@@ -4,7 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 
 interface NavbarProps {
   submissionId?: string;
-  onExportExcel?: () => void;
   onToggleSidebar?: () => void;
 }
 

@@ -133,4 +133,28 @@ export const proofStorage = {
       // ignore
     }
   },
+
+  async purgeDemoProofs(): Promise<void> {
+    try {
+      const db = await openDb();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const proofs: StoredProof[] = req.result || [];
+          proofs.forEach((p) => {
+            if (p.id?.startsWith('proof-demo') || !p.userId || p.fileName?.includes('Geotagged_Smart_Classroom') || p.fileName?.includes('High_End_Computer_Lab') || p.fileName?.includes('DELNET_Consortium')) {
+              store.delete(p.id);
+            }
+          });
+          resolve();
+        };
+        req.onerror = () => reject(req.error);
+      });
+    } catch (e) {
+      // ignore
+    }
+  },
 };
+

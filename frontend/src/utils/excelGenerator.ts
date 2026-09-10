@@ -35,24 +35,21 @@ export class ExcelService {
       (v: any) => v && (v.numericValue !== null || v.textValue || v.isNotApplicable)
     );
 
-    // If no values provided at all, populate baseline data so report is never blank
-    const useBaseline = dataList.length === 0;
-
     for (const val of dataList) {
       if (!val || typeof val !== 'object') continue;
-      const fCode = val.fieldCode || val.field?.code;
-      const yCode = val.yearCode || val.year?.code;
-      const fId = val.fieldId || val.field?.id;
-      const yId = val.yearId || val.year?.id;
+      const fCode = (val.fieldCode || val.field?.code || '').trim();
+      const yCode = (val.yearCode || val.year?.code || '').trim();
+      const fId = (val.fieldId || val.field?.id || '').trim();
+      const yId = (val.yearId || val.year?.id || '').trim();
 
       if (fCode && yCode) {
-        const cleanY = String(yCode).replace('y-', '');
+        const cleanY = yCode.replace('y-', '');
         valueMap.set(`${fCode}_${cleanY}`, val);
         valueMap.set(`${fCode}_y-${cleanY}`, val);
         valueMap.set(`${fCode}_${yCode}`, val);
       }
       if (fId && yCode) {
-        const cleanY = String(yCode).replace('y-', '');
+        const cleanY = yCode.replace('y-', '');
         valueMap.set(`${fId}_${cleanY}`, val);
         valueMap.set(`${fId}_y-${cleanY}`, val);
         valueMap.set(`${fId}_${yCode}`, val);
@@ -159,10 +156,9 @@ export class ExcelService {
     const metaRows = [
       ['Institution / Submitter Name', userName || 'Institutional Officer', 'Official Submitter'],
       ['Department', department || 'Academic Department', 'Academic Unit'],
-      ['Admin Email', 'datacollection0709@gmail.com', 'Recipient Mailbox'],
-      ['Total Attached Proofs', `${docList.length} files/links`, 'Photos Embedded & Clickable Google Drive Links'],
+      ['Total Attached Proofs', `${docList.length} files/documents`, 'Verification Evidence Attached'],
       ['Audit Academic Years', '2023–24, 2024–25, 2025–26', 'Accreditation Window'],
-      ['Report Status', useBaseline ? 'Baseline Audit Demonstration' : 'Official Data Entry Completed', 'Verified'],
+      ['Report Status', 'Data Entry Record', 'Verified'],
       ['Generated On', new Date().toLocaleString(), 'Institutional Export'],
     ];
 
@@ -299,29 +295,6 @@ export class ExcelService {
             }
           }
 
-          // Baseline fallback if user exports before filling
-          if (useBaseline) {
-            if (field.fieldType === 'NUMBER') return 10 + fIdx * 2 + yrIdx * 2;
-            if (field.fieldType === 'CURRENCY') {
-              const amt = field.code === '3.2.1a' ? 450000 + yrIdx * 70000 : 8500000 + yrIdx * 1000000;
-              return `₹ ${amt.toLocaleString('en-IN')}`;
-            }
-            if (field.fieldType === 'PERCENTAGE') return `${(5.29 + yrIdx * 0.26).toFixed(2)}%`;
-            if (field.fieldType === 'BOOLEAN') return 'Yes';
-            if (field.fieldType === 'RATIO') return `1:${15 - yrIdx}`;
-            if (field.fieldType === 'TEXT') {
-              if (field.code === '3.3.1') return 'DELNET, N-LIST';
-              if (field.code === '3.3.2') return 'Active';
-              if (field.code === '3.3.3') return 'Turnitin';
-              if (field.code === '3.3.4') return 'SPSS v28';
-              if (field.code === '3.3.5') return 'MATLAB';
-              if (field.code === '3.3.6') return 'AI / IoT Lab';
-              if (field.code === '3.3.7') return 'DSpace Repo';
-              if (field.code === '3.5.4') return 'JAWS Screen Reader';
-              return 'Operational';
-            }
-          }
-
           return '—';
         };
 
@@ -340,9 +313,9 @@ export class ExcelService {
         if (primaryDoc) {
           const docName = primaryDoc.originalFileName || primaryDoc.fileName || 'Proof Document';
           if (docs.length > 1) {
-            proofLinkText = `🔗 Open in Google Drive: ${docName} (+${docs.length - 1} more)`;
+            proofLinkText = `Open Document: ${docName} (+${docs.length - 1} more)`;
           } else {
-            proofLinkText = `🔗 Open in Google Drive: ${docName}`;
+            proofLinkText = `Open Document: ${docName}`;
           }
         }
 
@@ -408,7 +381,7 @@ export class ExcelService {
       const pTitle = proofsSheet.addRow(['', 'AUDIT PROOFS & VERIFICATION DOCUMENTS', '', '', '', '']);
       pTitle.getCell(2).font = titleFont;
 
-      const pSub = proofsSheet.addRow(['', 'Direct Clickable Google Drive Links for Verification (Admin: datacollection0709@gmail.com)', '', '', '', '']);
+      const pSub = proofsSheet.addRow(['', 'Institutional Supporting Documents and Evidence Verification Links', '', '', '', '']);
       pSub.getCell(2).font = subtitleFont;
       proofsSheet.addRow([]);
 
@@ -417,7 +390,7 @@ export class ExcelService {
         'Indicator Code',
         'Facility / Indicator Description',
         'Document Name / Title',
-        'Google Drive Verification Link',
+        'Verification Link',
         'Date Attached',
       ]);
       pHeader.height = 28;
@@ -431,7 +404,7 @@ export class ExcelService {
       allDriveProofs.forEach((item, idx) => {
         const doc = item.doc;
         const fileName = doc.originalFileName || doc.fileName || `Proof Document ${idx + 1}`;
-        const targetUrl = doc.hyperlink || (doc.fileUrl && doc.fileUrl !== '#' ? doc.fileUrl : 'https://drive.google.com/drive/my-drive');
+        const targetUrl = doc.hyperlink || (doc.fileUrl && doc.fileUrl !== '#' ? doc.fileUrl : null);
         const uploadDate = new Date(doc.uploadedAt || Date.now()).toLocaleDateString('en-IN', {
           year: 'numeric',
           month: 'short',
@@ -443,7 +416,7 @@ export class ExcelService {
           item.fieldCode,
           item.fieldLabel,
           fileName,
-          `🔗 Open in Google Drive: ${fileName}`,
+          targetUrl ? `Open: ${fileName}` : 'Attached in Record',
           uploadDate,
         ]);
         row.height = 26;
@@ -462,9 +435,9 @@ export class ExcelService {
 
         if (targetUrl) {
           row.getCell(5).value = {
-            text: `🔗 Open in Google Drive: ${fileName}`,
+            text: `Open: ${fileName}`,
             hyperlink: targetUrl,
-            tooltip: `Click to open ${fileName} in Google Drive / Web`,
+            tooltip: `Click to open ${fileName} in browser`,
           };
           row.getCell(5).font = {
             name: 'Arial',
@@ -482,7 +455,7 @@ export class ExcelService {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
     const cleanDept = (department || 'Institutional').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const fileName = `Attribute_3_${cleanDept}_Report.xlsx`;
+    const fileName = `Resource_Survey_${cleanDept}_Report.xlsx`;
 
     return { blob, buffer, fileName };
   }

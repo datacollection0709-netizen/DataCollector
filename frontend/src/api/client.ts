@@ -164,27 +164,17 @@ class LocalApiClient {
 
     // Sync documents with proofStorage (IndexedDB) to ensure images and links are never lost
     try {
-      const storedProofs = await proofStorage.getAllProofs();
-      const userProofs = storedProofs.filter((sp: any) => sp.userId === user?.id);
-      if (userProofs && userProofs.length > 0) {
-        const docMap = new Map<string, any>();
-        (current.documents || []).forEach((d: any) => docMap.set(d.id, d));
-        userProofs.forEach((sp) => {
-          const existing = docMap.get(sp.id) || {};
-          docMap.set(sp.id, {
-            ...existing,
-            id: sp.id,
-            fieldCode: sp.fieldCode,
-            yearCode: sp.yearCode,
-            originalFileName: sp.fileName,
-            fileSize: sp.fileSize,
-            mimeType: sp.mimeType,
-            uploadedAt: sp.uploadedAt,
-            dataUrl: sp.dataUrl || existing.dataUrl,
-            hyperlink: sp.hyperlink || existing.hyperlink,
-          });
-        });
-        current.documents = Array.from(docMap.values());
+      await proofStorage.purgeDemoProofs();
+      if (current.documents && current.documents.length > 0) {
+        for (let i = 0; i < current.documents.length; i++) {
+          const doc = current.documents[i];
+          if (!doc.dataUrl) {
+            const sp = await proofStorage.getProof(doc.id);
+            if (sp && sp.dataUrl) {
+              doc.dataUrl = sp.dataUrl;
+            }
+          }
+        }
       }
     } catch (e) {
       // ignore
@@ -395,26 +385,16 @@ class LocalApiClient {
     const user = this.getLocalUser();
     const adminEmail = 'datacollection0709@gmail.com';
 
-    // Retrieve full documents with images from proofStorage
-    let fullDocs = sub.documents || [];
+    // Retrieve full documents with images from proofStorage for attached documents only
+    let fullDocs = (sub.documents || []).map((d: any) => ({ ...d }));
     try {
-      const stored = await proofStorage.getAllProofs();
-      if (stored && stored.length > 0) {
-        const map = new Map<string, any>();
-        fullDocs.forEach((d: any) => map.set(d.id, d));
-        stored.forEach((s) => {
-          map.set(s.id, {
-            ...(map.get(s.id) || {}),
-            id: s.id,
-            fieldCode: s.fieldCode,
-            originalFileName: s.fileName,
-            fileSize: s.fileSize,
-            mimeType: s.mimeType,
-            dataUrl: s.dataUrl,
-            hyperlink: s.hyperlink,
-          });
-        });
-        fullDocs = Array.from(map.values());
+      for (const d of fullDocs) {
+        if (!d.dataUrl) {
+          const sp = await proofStorage.getProof(d.id);
+          if (sp && sp.dataUrl) {
+            d.dataUrl = sp.dataUrl;
+          }
+        }
       }
     } catch (e) {}
 
@@ -436,14 +416,14 @@ class LocalApiClient {
     const proofsListText = fullDocs
       .map((d: any, idx: number) => {
         const isPhoto = d.mimeType?.startsWith('image/') || d.dataUrl?.startsWith('data:image/');
-        const type = isPhoto ? '📷 Photo' : d.hyperlink ? '🔗 Link' : '📄 Doc';
-        return `${idx + 1}. [${d.fieldCode}] ${type} - ${d.originalFileName || d.fileName}: ${d.hyperlink || 'Embedded in Excel'}`;
+        const type = isPhoto ? 'Photo' : d.hyperlink ? 'Link' : 'Document';
+        return `${idx + 1}. [${d.fieldCode}] ${type} - ${d.originalFileName || d.fileName}: ${d.hyperlink || 'Attached'}`;
       })
       .join('\n') || 'None attached';
 
     // Generate the official Excel workbook report with embedded photos and links
     let excelBlob: Blob | null = null;
-    let excelFileName = 'Attribute_3_Report.xlsx';
+    let excelFileName = 'Resource_Survey_Report.xlsx';
     try {
       const res = await ExcelService.generateAttribute3WorkbookBlob(
         sub.values,
@@ -748,7 +728,7 @@ class LocalApiClient {
     subs[submissionId].documents.push(doc);
     this.saveSubmissionsData(subs);
 
-    return { success: true, message: 'File uploaded directly to Google Drive!', document: doc };
+    return { success: true, message: 'File attached successfully.', document: doc };
   }
 
   // Strategy 3: Hyperlink proof
@@ -834,56 +814,40 @@ class LocalApiClient {
     return '#';
   }
 
-  async downloadExcel(submissionId?: string, filename = 'Attribute_3_Report.xlsx') {
+  async downloadExcel(submissionId?: string, filename = 'Resource_Survey_Report.xlsx') {
+    const user = this.getLocalUser();
     const subs = this.getSubmissionsData();
     let sub = submissionId ? subs[submissionId] : null;
 
-    if (!sub || !sub.values || sub.values.length === 0) {
-      const allSubs: any[] = Object.values(subs);
-      allSubs.sort((a: any, b: any) => (b.values?.length || 0) - (a.values?.length || 0));
-      if (allSubs[0] && allSubs[0].values?.length > 0) {
-        sub = allSubs[0];
+    // If sub not found by ID, locate the active submission for current logged in user
+    if (!sub && user?.id) {
+      const userSubs = Object.values(subs)
+        .filter((s: any) => s.userId === user.id)
+        .sort((a: any, b: any) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+      if (userSubs.length > 0) {
+        sub = userSubs[0];
       }
     }
 
-    let valuesToUse = sub?.values || [];
-
-    if (valuesToUse.length === 0) {
-      const stored = localStorage.getItem('attribute3_current_values');
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed)) valuesToUse = parsed;
-          else if (typeof parsed === 'object') valuesToUse = Object.values(parsed);
-        } catch (e) {}
-      }
+    if (!sub) {
+      sub = { id: submissionId || 'default', values: [], documents: [] };
     }
 
-    // Merge proofs from IndexedDB
-    let docsToUse = sub?.documents || [];
+    const valuesToUse = sub.values || [];
+    const docsToUse = (sub.documents || []).map((d: any) => ({ ...d }));
+
+    // Enrich only active attached documents with cached dataUrl if missing
     try {
-      const allProofs = await proofStorage.getAllProofs();
-      if (allProofs && allProofs.length > 0) {
-        const docMap = new Map<string, any>();
-        docsToUse.forEach((d: any) => docMap.set(d.id, d));
-        allProofs.forEach((p) => {
-          docMap.set(p.id, {
-            ...(docMap.get(p.id) || {}),
-            id: p.id,
-            fieldCode: p.fieldCode,
-            yearCode: p.yearCode,
-            originalFileName: p.fileName,
-            fileSize: p.fileSize,
-            mimeType: p.mimeType,
-            dataUrl: p.dataUrl,
-            hyperlink: p.hyperlink,
-          });
-        });
-        docsToUse = Array.from(docMap.values());
+      for (const d of docsToUse) {
+        if (!d.dataUrl) {
+          const sp = await proofStorage.getProof(d.id);
+          if (sp && sp.dataUrl) {
+            d.dataUrl = sp.dataUrl;
+          }
+        }
       }
     } catch (e) {}
 
-    const user = this.getLocalUser();
     await ExcelService.generateAndDownloadAttribute3Workbook(
       valuesToUse,
       user?.name || 'Institutional Officer',

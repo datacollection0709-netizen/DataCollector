@@ -30,7 +30,6 @@ interface SidebarProps {
     missingRequiredProofs: any[];
   };
   submissionStatus?: string;
-  onExportExcel: () => void;
   isOpen?: boolean;
   onClose?: () => void;
 }
@@ -40,7 +39,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   progress,
   submissionStatus,
-  onExportExcel,
   isOpen,
   onClose,
 }) => {
@@ -153,7 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {pct === 100 ? (
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                 ) : (
-                  <span className="text-[10px] font-mono text-slate-400 font-medium">{pct}%</span>
+                  <span className="text-[10px] tabular-nums text-slate-400 font-medium">{pct}%</span>
                 )}
               </div>
             </button>

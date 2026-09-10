@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckSquare,
   AlertTriangle,
@@ -46,13 +46,19 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [mailtoUrl, setMailtoUrl] = useState<string | null>(null);
 
+  useEffect(() => {
+    onRefreshSubmission();
+  }, []);
+
   const toggleCollapse = (code: string) => {
     setCollapsedSections((prev) => ({ ...prev, [code]: !prev[code] }));
   };
 
-  // Map values with multi-source fallback
+  // Map values with multi-source fallback, prioritizing freshest localStorage
   const valueMap = new Map<string, any>();
-  let valuesSource = submission?.values || [];
+  const subsStr = localStorage.getItem('attribute3_submissions');
+  const subs = subsStr ? JSON.parse(subsStr) : {};
+  let valuesSource = (submission?.id && subs[submission.id]?.values) || submission?.values || [];
   if (valuesSource.length === 0) {
     const raw = localStorage.getItem('attribute3_current_values');
     if (raw) {
@@ -74,14 +80,13 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
 
   // Map docs
   const docMap = new Map<string, any[]>();
-  if (submission?.documents) {
-    for (const d of submission.documents) {
-      const fCode = d.field?.code || d.fieldCode;
-      if (!fCode) continue;
-      const list = docMap.get(fCode) || [];
-      list.push(d);
-      docMap.set(fCode, list);
-    }
+  const activeDocs = (submission?.id && subs[submission.id]?.documents) || submission?.documents || [];
+  for (const d of activeDocs) {
+    const fCode = d.field?.code || d.fieldCode;
+    if (!fCode) continue;
+    const list = docMap.get(fCode) || [];
+    list.push(d);
+    docMap.set(fCode, list);
   }
 
   const overall = progress?.overallPercentage ?? 0;
@@ -110,17 +115,17 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold font-mono bg-brand-50 text-brand-700 border border-brand-200/60">
-                FINAL AUDIT & REVIEW
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Final Review
               </span>
+              <span className="text-slate-300">•</span>
               <StatusBadge status={submission?.status || 'DRAFT'} />
-
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               Resource Survey: Comprehensive Review
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              Verify all metrics, in-cell photo evidence (max 2 MB), and Drive links across 2023–24, 2024–25, and 2025–26.
+              Review and verify all institutional metrics and attached evidence across 2023–24, 2024–25, and 2025–26.
             </p>
           </div>
 
@@ -191,14 +196,15 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                 onClick={() => toggleCollapse(sec.code)}
                 className="flex items-center justify-between p-4 sm:p-5 bg-slate-50/50 hover:bg-slate-100/60 cursor-pointer transition-colors border-b border-slate-100"
               >
-                <div className="flex items-center gap-3">
-                  <span className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 font-mono font-bold text-xs flex items-center justify-center border border-brand-200/50">
-                    {sec.code}
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800">{sec.title}</h3>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                      Section {sec.code}
+                    </span>
+                    <span className="text-slate-300">•</span>
                     <span className="text-[11px] text-slate-500">{sec.fields?.length} Indicators</span>
                   </div>
+                  <h3 className="text-sm font-bold text-slate-800 mt-0.5">{sec.title}</h3>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -237,11 +243,11 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                   <table className="w-full text-xs text-left">
                     <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
-                        <th className="py-2.5 px-3 w-20 font-mono">Sr. No.</th>
+                        <th className="py-2.5 px-3 w-20 tabular-nums">Sr. No.</th>
                         <th className="py-2.5 px-3 min-w-[220px]">Facility / Resource</th>
-                        <th className="py-2.5 px-3 text-center w-28 font-mono">2023–24</th>
-                        <th className="py-2.5 px-3 text-center w-28 font-mono">2024–25</th>
-                        <th className="py-2.5 px-3 text-center w-28 font-mono">2025–26</th>
+                        <th className="py-2.5 px-3 text-center w-28 tabular-nums">2023–24</th>
+                        <th className="py-2.5 px-3 text-center w-28 tabular-nums">2024–25</th>
+                        <th className="py-2.5 px-3 text-center w-28 tabular-nums">2025–26</th>
                         <th className="py-2.5 px-3 min-w-[220px]">Attached Proofs & Photos</th>
                       </tr>
                     </thead>
@@ -256,7 +262,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                           if (!v) return <span className="text-slate-300">—</span>;
                           if (v.isNotApplicable) {
                             return (
-                              <span className="font-mono font-semibold text-[11px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60">
+                              <span className="tabular-nums font-semibold text-[11px] px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60">
                                 N/A
                               </span>
                             );
@@ -264,7 +270,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
 
                           if (field.fieldType === 'CURRENCY') {
                             return (
-                              <span className="font-mono font-medium">
+                              <span className="tabular-nums font-medium">
                                 {v.numericValue !== null && v.numericValue !== undefined
                                   ? `₹ ${Number(v.numericValue).toLocaleString('en-IN')}`
                                   : '—'}
@@ -273,7 +279,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                           }
                           if (field.fieldType === 'PERCENTAGE') {
                             return (
-                              <span className="font-mono font-medium">
+                              <span className="tabular-nums font-medium">
                                 {v.numericValue !== null && v.numericValue !== undefined
                                   ? `${Number(v.numericValue).toFixed(2)}%`
                                   : '—'}
@@ -281,7 +287,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                             );
                           }
                           if (field.fieldType === 'RATIO') {
-                            return <span className="font-mono font-medium">{v.textValue || '—'}</span>;
+                            return <span className="tabular-nums font-medium">{v.textValue || '—'}</span>;
                           }
                           if (field.fieldType === 'BOOLEAN') {
                             const isYes = v.textValue === 'Yes' || v.numericValue === 1;
@@ -298,14 +304,14 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                             );
                           }
                           if (field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL') {
-                            return <span className="font-mono">{v.numericValue ?? '—'}</span>;
+                            return <span className="tabular-nums">{v.numericValue ?? '—'}</span>;
                           }
                           return <span>{v.textValue || '—'}</span>;
                         };
 
                         return (
                           <tr key={field.code} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="py-2.5 px-3 font-mono font-bold text-slate-600">
+                            <td className="py-2.5 px-3 tabular-nums font-semibold text-slate-600">
                               {field.code}
                             </td>
                             <td className="py-2.5 px-3">

@@ -54,12 +54,18 @@ export const App: React.FC = () => {
     } else {
       setSubmission(null);
       setProgress(null);
-      setActiveTab('dashboard');
     }
   }, [user]);
 
+  useEffect(() => {
+    if (user && activeTab === 'review') {
+      loadData();
+    }
+  }, [activeTab, user]);
+
   const handleExportExcel = async () => {
     try {
+      await loadData();
       await api.downloadExcel(submission?.id);
     } catch (err: any) {
       alert('Excel export error: ' + err.message);
@@ -90,7 +96,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <Navbar submissionId={submission?.id} onExportExcel={handleExportExcel} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+      <Navbar submissionId={submission?.id} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
 
       <div className="flex-1 flex max-w-7xl w-full mx-auto relative">
         {/* Mobile Sidebar Overlay */}
@@ -109,7 +115,6 @@ export const App: React.FC = () => {
           }}
           progress={progress}
           submissionStatus={submission?.status}
-          onExportExcel={handleExportExcel}
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />
@@ -127,7 +132,6 @@ export const App: React.FC = () => {
               progress={progress}
               onNavigateSection={(code) => setActiveTab(code)}
               onNavigateReview={() => setActiveTab('review')}
-              onExportExcel={handleExportExcel}
             />
           )}
 

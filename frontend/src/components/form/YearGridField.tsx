@@ -104,7 +104,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
       {/* Top Row: Code Badge, Title, Unit, and Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
         <div className="flex items-start gap-3">
-          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-bold font-mono bg-brand-50 text-brand-700 border border-brand-200/60 flex-shrink-0">
+          <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-lg text-xs font-semibold tabular-nums bg-slate-100 text-slate-700 border border-slate-200 flex-shrink-0">
             {field.code}
           </span>
 
@@ -215,7 +215,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
               >
                 {/* Year Card Header */}
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs font-bold tracking-wide text-slate-700 font-mono">
+                  <span className="text-xs font-semibold tracking-wide text-slate-700 tabular-nums">
                     {year.code}
                   </span>
                   <label className="flex items-center gap-1 cursor-pointer hover:bg-slate-200/50 px-1.5 py-0.5 rounded transition-colors text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
@@ -238,7 +238,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
 
                 {/* Input Renderers */}
                 {isYearNA ? (
-                  <div className="py-2.5 text-center text-xs font-mono text-slate-400 font-semibold bg-white rounded-lg border border-dashed border-slate-200">
+                  <div className="py-2.5 text-center text-xs text-slate-400 font-medium bg-white rounded-lg border border-dashed border-slate-200">
                     N/A
                   </div>
                 ) : field.fieldType === 'NUMBER' || field.fieldType === 'DECIMAL' ? (
@@ -257,7 +257,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                           isNotApplicable: false,
                         });
                       }}
-                      className="w-full bg-transparent border-0 py-2 px-3 text-right font-mono text-sm sm:text-base font-semibold text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-normal"
+                      className="w-full bg-transparent border-0 py-2 px-3 text-right font-sans tabular-nums text-sm sm:text-base font-semibold text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-normal"
                     />
                     {field.unit && (
                       <div className="pr-3 pl-1 text-xs text-slate-400 select-none whitespace-nowrap">
@@ -283,7 +283,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                           isNotApplicable: false,
                         });
                       }}
-                      className="w-full bg-transparent border-0 py-2 px-3 text-right font-mono text-sm sm:text-base font-semibold text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-normal"
+                      className="w-full bg-transparent border-0 py-2 px-3 text-right font-sans tabular-nums text-sm sm:text-base font-semibold text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-normal"
                     />
                   </div>
                 ) : field.fieldType === 'PERCENTAGE' ? (
@@ -303,7 +303,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                           isNotApplicable: false,
                         });
                       }}
-                      className="w-full bg-transparent border-0 py-2 px-3 text-right font-mono text-sm sm:text-base font-semibold text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-normal"
+                      className="w-full bg-transparent border-0 py-2 px-3 text-right font-sans tabular-nums text-sm sm:text-base font-semibold text-slate-900 focus:ring-0 outline-none placeholder:text-slate-300 placeholder:font-normal"
                     />
                     <div className="pr-3 pl-1 text-xs font-bold text-slate-400 select-none">
                       %
@@ -331,7 +331,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                               numericValue: n && denom ? Math.round(n / denom) : null,
                             });
                           }}
-                          className="w-full text-center font-mono text-xs sm:text-sm font-semibold text-slate-900 border-0 p-0 focus:ring-0 outline-none"
+                          className="w-full text-center font-sans tabular-nums text-xs sm:text-sm font-semibold text-slate-900 border-0 p-0 focus:ring-0 outline-none"
                         />
                       </div>
                       <div className="bg-white border border-slate-200 rounded-lg p-1.5 focus-within:border-brand-500">
@@ -353,12 +353,12 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
                               numericValue: num && d ? Math.round(num / d) : null,
                             });
                           }}
-                          className="w-full text-center font-mono text-xs sm:text-sm font-semibold text-slate-900 border-0 p-0 focus:ring-0 outline-none"
+                          className="w-full text-center font-sans tabular-nums text-xs sm:text-sm font-semibold text-slate-900 border-0 p-0 focus:ring-0 outline-none"
                         />
                       </div>
                     </div>
                     {val.textValue && (
-                      <div className="text-[11px] font-mono text-center font-semibold text-brand-700 bg-brand-50/80 py-1 rounded-md border border-brand-200/50">
+                      <div className="text-[11px] font-sans tabular-nums text-center font-semibold text-brand-700 bg-brand-50/80 py-1 rounded-md border border-brand-200/50">
                         Ratio: {val.textValue}
                       </div>
                     )}
@@ -438,7 +438,7 @@ export const YearGridField: React.FC<YearGridFieldProps> = ({
           </div>
           <textarea
             rows={2}
-            placeholder="Add context or notes for the reviewer / admin (datacollection0709@gmail.com)..."
+            placeholder="Add context or notes for the reviewer..."
             value={years.map((y) => values[y.code]?.remarks).filter(Boolean)[0] || ''}
             onChange={(e) => {
               const text = e.target.value;
