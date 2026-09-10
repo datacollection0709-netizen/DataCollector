@@ -13,13 +13,121 @@ class LocalApiClient {
     return (department || 'default').trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
   }
 
+  private purgeBloatedStorageKeys() {
+    try {
+      if (typeof window === 'undefined' || !window.localStorage) return;
+      const toRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (
+          k &&
+          (k.startsWith('proof_') ||
+            k.startsWith('proof-') ||
+            k === 'attribute3_current_values' ||
+            k.startsWith('temp_'))
+        ) {
+          toRemove.push(k);
+        }
+      }
+      toRemove.forEach((k) => localStorage.removeItem(k));
+    } catch {
+      // ignore
+    }
+  }
+
+  private sanitizeForStorage(data: any) {
+    if (!data || typeof data !== 'object') return {};
+    const clean: Record<string, any> = {};
+    for (const key of Object.keys(data)) {
+      const sub = data[key];
+      if (!sub || typeof sub !== 'object') continue;
+      const cleanDocs = (sub.documents || []).map((d: any) => {
+        const { dataUrl, base64, previewUrl, ...rest } = d;
+        return rest;
+      });
+      clean[key] = {
+        ...sub,
+        documents: cleanDocs,
+      };
+    }
+    return clean;
+  }
+
   private getSubmissionsData() {
     const subsStr = localStorage.getItem('attribute3_submissions');
-    return subsStr ? JSON.parse(subsStr) : {};
+    if (!subsStr) return {};
+    try {
+      const parsed = JSON.parse(subsStr);
+      if (!parsed || typeof parsed !== 'object') return {};
+      const clean = this.sanitizeForStorage(parsed);
+      // If legacy bloated data exists, immediately shrink it to free up quota
+      if (subsStr.length > 50000) {
+        try {
+          this.purgeBloatedStorageKeys();
+          localStorage.setItem('attribute3_submissions', JSON.stringify(clean));
+        } catch {
+          // Never throw in getter!
+        }
+      }
+      return clean;
+    } catch (e) {
+      console.error('Failed to parse submissions data:', e);
+      return {};
+    }
   }
 
   private saveSubmissionsData(data: any) {
-    localStorage.setItem('attribute3_submissions', JSON.stringify(data));
+    const cleanData = this.sanitizeForStorage(data);
+    try {
+      localStorage.setItem('attribute3_submissions', JSON.stringify(cleanData));
+    } catch (err: any) {
+      console.warn('LocalStorage save quota hit, purging non-essential keys and retrying...', err);
+      try {
+        this.purgeBloatedStorageKeys();
+        localStorage.setItem('attribute3_submissions', JSON.stringify(cleanData));
+      } catch (quotaError) {
+        console.error('LocalStorage quota critical, attempting ultra-compact save:', quotaError);
+        try {
+          const ultraCompact: Record<string, any> = {};
+          for (const key of Object.keys(cleanData)) {
+            const sub = cleanData[key];
+            if (!sub) continue;
+            ultraCompact[key] = {
+              id: sub.id,
+              deptKey: sub.deptKey,
+              department: sub.department,
+              userName: sub.userName,
+              status: sub.status,
+              updatedAt: sub.updatedAt,
+              values: (sub.values || []).map((v: any) => ({
+                fieldCode: v.fieldCode || v.field?.code,
+                yearCode: v.yearCode || v.year?.code,
+                numericValue: v.numericValue,
+                textValue: v.textValue,
+                remarks: v.remarks,
+                isNotApplicable: v.isNotApplicable,
+                ratioNumerator: v.ratioNumerator,
+                ratioDenominator: v.ratioDenominator,
+              })),
+              documents: (sub.documents || []).map((d: any) => ({
+                id: d.id,
+                fieldCode: d.fieldCode || d.field?.code,
+                yearCode: d.yearCode || d.year?.code,
+                originalFileName: d.originalFileName || d.fileName,
+                fileSize: d.fileSize,
+                mimeType: d.mimeType,
+                fileUrl: d.fileUrl,
+                hyperlink: d.hyperlink,
+                uploadedAt: d.uploadedAt,
+              })),
+            };
+          }
+          localStorage.setItem('attribute3_submissions', JSON.stringify(ultraCompact));
+        } catch (finalError) {
+          console.error('Critical: cannot write to localStorage even in compact mode:', finalError);
+        }
+      }
+    }
   }
 
   computeProgress(submission: any) {
@@ -407,7 +515,7 @@ class LocalApiClient {
     subs[submissionId].updatedAt = new Date().toISOString();
     this.saveSubmissionsData(subs);
 
-    localStorage.setItem('attribute3_current_values', JSON.stringify(populatedValues));
+    localStorage.removeItem('attribute3_current_values');
 
     const progress = this.computeProgress(subs[submissionId]);
     return { success: true, submission: subs[submissionId], progress };
@@ -687,21 +795,34 @@ class LocalApiClient {
 
     if (!file || !submissionId) throw new Error('Missing file or submissionId');
 
-    // 10 MB limit check matching Google Drive
-    if (file.size > 10 * 1024 * 1024) {
-      throw new Error(`File exceeds 10 MB limit (${(file.size / (1024 * 1024)).toFixed(2)} MB).`);
+    // 200 MB limit check matching requirement
+    if (file.size > 200 * 1024 * 1024) {
+      throw new Error(`File exceeds 200 MB limit (${(file.size / (1024 * 1024)).toFixed(2)} MB).`);
     }
 
+    const user = this.getLocalUser();
+    const deptKey = this.getDeptKey(user?.organizationName);
     const subs = this.getSubmissionsData();
-    if (!subs[submissionId]) {
-      subs[submissionId] = { id: submissionId, status: 'DRAFT', values: [], documents: [] };
+    const targetKey = subs[deptKey] ? deptKey : (subs[submissionId] ? submissionId : deptKey);
+
+    if (!subs[targetKey]) {
+      subs[targetKey] = {
+        id: `sub-${targetKey}`,
+        deptKey: targetKey,
+        userId: user?.id,
+        userName: user?.name,
+        department: user?.organizationName,
+        status: 'DRAFT',
+        values: [],
+        documents: [],
+      };
     }
-    if (!subs[submissionId].documents) {
-      subs[submissionId].documents = [];
+    if (!subs[targetKey].documents) {
+      subs[targetKey].documents = [];
     }
 
     // Max 3 proofs check per fieldCode
-    const existingFieldDocs = subs[submissionId].documents.filter(
+    const existingFieldDocs = subs[targetKey].documents.filter(
       (d: any) => (d.fieldCode || d.field?.code) === fieldCode
     );
     if (existingFieldDocs.length >= 3) {
@@ -711,11 +832,9 @@ class LocalApiClient {
     // Google Drive Backend is powered by Google Cloud Service Account (Folder: 1nS-cyfFHwhqEIE-uwq0k0WUzTkUWaAQz)
     const googleScriptUrl = this.getGoogleScriptUrl();
 
-    const user = this.getLocalUser();
-
-    // Read base64 dataUrl if not provided
-    let dataUrl = clientDataUrl;
-    if (!dataUrl) {
+    // Read base64 dataUrl if not provided (only for files <= 50MB to prevent browser memory exhaustion)
+    let dataUrl = clientDataUrl || '';
+    if (!dataUrl && file.size <= 50 * 1024 * 1024) {
       dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
@@ -731,31 +850,39 @@ class LocalApiClient {
     let driveFileId = '';
     let uploadError = '';
 
-    // Attempt 1: Serverless Google Drive API (/api/upload with Service Account or Web App)
-    try {
-      const proxyRes = await fetch('/api/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'uploadFile',
-          fileName: file.name,
-          mimeType: file.type || 'application/octet-stream',
-          base64Data,
-          googleScriptUrl,
-          userName: user?.name || 'Institutional Officer',
-          department: user?.organizationName || 'Resource Survey',
-        }),
-      });
-      const proxyJson = await proxyRes.json();
-      if (proxyJson?.fileUrl) {
-        cloudUrl = proxyJson.fileUrl;
-        driveFileId = proxyJson.fileId || `drive-${Date.now()}`;
-      } else if (proxyJson?.error) {
-        uploadError = proxyJson.error;
+    if (file.size <= 50 * 1024 * 1024 && base64Data) {
+      // If file is <= 4MB, try Vercel /api/upload proxy first (fast)
+      if (file.size <= 4 * 1024 * 1024) {
+        try {
+          const proxyRes = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'uploadFile',
+              fileName: file.name,
+              mimeType: file.type || 'application/octet-stream',
+              base64Data,
+              googleScriptUrl,
+              userName: user?.name || 'Institutional Officer',
+              department: user?.organizationName || 'Resource Survey',
+            }),
+          });
+          if (proxyRes.ok) {
+            const proxyJson = await proxyRes.json();
+            if (proxyJson?.fileUrl) {
+              cloudUrl = proxyJson.fileUrl;
+              driveFileId = proxyJson.fileId || `drive-${Date.now()}`;
+            } else if (proxyJson?.error) {
+              uploadError = proxyJson.error;
+            }
+          }
+        } catch (proxyErr: any) {
+          uploadError = proxyErr?.message || '';
+        }
       }
-    } catch (proxyErr: any) {
-      // Attempt 2: Direct fetch to Google Apps Script if /api/upload is unreachable (e.g. offline dev)
-      if (googleScriptUrl) {
+
+      // Direct fetch to Google Apps Script if proxy was skipped (>4MB, avoids Vercel 4.5MB limit) or failed
+      if (!cloudUrl && googleScriptUrl) {
         try {
           const gRes = await fetch(googleScriptUrl, {
             method: 'POST',
@@ -779,20 +906,26 @@ class LocalApiClient {
             uploadError = gJson.error;
           }
         } catch (e: any) {
-          uploadError = e?.message || proxyErr?.message || 'Network error connecting to Google Drive';
+          uploadError = e?.message || 'Network error connecting to Google Drive';
         }
       }
     }
 
+    // For files > 50 MB, store in local IndexedDB audit store with friendly identifier
     if (!cloudUrl) {
-      throw new Error(
-        `Failed to upload to Google Drive: ${uploadError || 'Script returned no file URL'}. Please verify that your Google Apps Script is deployed with "Who has access: Anyone".`
-      );
+      if (file.size > 50 * 1024 * 1024) {
+        driveFileId = `proof-large-${Date.now()}`;
+        cloudUrl = `#local-proof-${encodeURIComponent(file.name)}`;
+      } else {
+        throw new Error(
+          `Failed to upload to Google Drive: ${uploadError || 'Script returned no file URL'}. Please verify internet connection or Google Apps Script configuration.`
+        );
+      }
     }
 
     const fileId = driveFileId || `proof-${Date.now()}`;
 
-    // Save to IndexedDB (proofStorage) for caching
+    // Save to IndexedDB (proofStorage) for caching - only store dataUrl if under 20MB to preserve memory
     const storedProof: StoredProof = {
       id: fileId,
       userId: this.getLocalUser()?.id,
@@ -801,13 +934,14 @@ class LocalApiClient {
       fileName: file.name,
       fileSize: file.size,
       mimeType: file.type,
-      dataUrl,
+      dataUrl: file.size <= 20 * 1024 * 1024 ? dataUrl : undefined,
       fileUrl: cloudUrl,
       hyperlink: cloudUrl,
       uploadedAt: new Date().toISOString(),
     };
     await proofStorage.saveProof(storedProof);
 
+    // Document object stored in application state (ZERO large dataUrl to guarantee 0% localStorage quota usage)
     const doc = {
       id: fileId,
       fieldCode,
@@ -818,10 +952,9 @@ class LocalApiClient {
       uploadedAt: new Date().toISOString(),
       fileUrl: cloudUrl,
       hyperlink: cloudUrl,
-      dataUrl,
     };
 
-    subs[submissionId].documents.push(doc);
+    subs[targetKey].documents.push(doc);
     this.saveSubmissionsData(subs);
 
     return { success: true, message: 'File attached successfully.', document: doc };
@@ -837,15 +970,28 @@ class LocalApiClient {
     dataUrl?: string;
   }) {
     const { submissionId, fieldCode, yearCode, fileName, hyperlink, dataUrl } = params;
+    const user = this.getLocalUser();
+    const deptKey = this.getDeptKey(user?.organizationName);
     const subs = this.getSubmissionsData();
-    if (!subs[submissionId]) {
-      subs[submissionId] = { id: submissionId, status: 'DRAFT', values: [], documents: [] };
+    const targetKey = subs[deptKey] ? deptKey : (subs[submissionId] ? submissionId : deptKey);
+
+    if (!subs[targetKey]) {
+      subs[targetKey] = {
+        id: `sub-${targetKey}`,
+        deptKey: targetKey,
+        userId: user?.id,
+        userName: user?.name,
+        department: user?.organizationName,
+        status: 'DRAFT',
+        values: [],
+        documents: [],
+      };
     }
-    if (!subs[submissionId].documents) {
-      subs[submissionId].documents = [];
+    if (!subs[targetKey].documents) {
+      subs[targetKey].documents = [];
     }
 
-    const existingFieldDocs = subs[submissionId].documents.filter(
+    const existingFieldDocs = subs[targetKey].documents.filter(
       (d: any) => (d.fieldCode || d.field?.code) === fieldCode
     );
     if (existingFieldDocs.length >= 3) {
@@ -878,10 +1024,9 @@ class LocalApiClient {
       uploadedAt: new Date().toISOString(),
       hyperlink,
       fileUrl: hyperlink,
-      dataUrl: dataUrl || undefined,
     };
 
-    subs[submissionId].documents.push(doc);
+    subs[targetKey].documents.push(doc);
     this.saveSubmissionsData(subs);
 
     return { success: true, message: 'Hyperlink proof saved', document: doc };

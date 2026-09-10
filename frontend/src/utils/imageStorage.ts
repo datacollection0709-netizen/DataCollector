@@ -47,10 +47,11 @@ export const proofStorage = {
         req.onerror = () => reject(req.error);
       });
     } catch (e) {
-      // Fallback to localStorage if IndexedDB fails
+      // Fallback to localStorage metadata only (never store massive base64 in localStorage)
       try {
-        const key = `proof_${proof.id}`;
-        localStorage.setItem(key, JSON.stringify(proof));
+        const { dataUrl, ...safeProof } = proof;
+        const key = `proof_meta_${proof.id}`;
+        localStorage.setItem(key, JSON.stringify(safeProof));
       } catch (err) {
         console.warn('Proof fallback save warning:', err);
       }
@@ -68,7 +69,7 @@ export const proofStorage = {
         req.onerror = () => reject(req.error);
       });
     } catch (e) {
-      const local = localStorage.getItem(`proof_${id}`);
+      const local = localStorage.getItem(`proof_meta_${id}`) || localStorage.getItem(`proof_${id}`);
       return local ? JSON.parse(local) : null;
     }
   },
@@ -158,3 +159,21 @@ export const proofStorage = {
   },
 };
 
+export function purgeLegacyLocalStorageProofs(): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('proof_') || k.startsWith('proof-') || k === 'attribute3_current_values')) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // ignore
+  }
+}
+
+// Immediately purge legacy bloated keys from localStorage on startup
+purgeLegacyLocalStorageProofs();
