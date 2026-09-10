@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../api/client';
+import { proofStorage } from '../utils/imageStorage';
 
 export type UserRole = 'ADMIN' | 'REVIEWER' | 'DATA_ENTRY';
 
@@ -53,20 +54,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('attribute3_token');
-    localStorage.removeItem('attribute3_local_user');
-    localStorage.removeItem('attribute3_current_values');
-    localStorage.removeItem('attribute3_submissions');
-    // Clear all proof-related local storage items
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('proof_')) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key));
+  const logout = async () => {
+    localStorage.clear();
+    await proofStorage.clearAllProofs();
     setUser(null);
   };
 

@@ -49,7 +49,12 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (user) {
+      setAppLoading(true);
       loadData();
+    } else {
+      setSubmission(null);
+      setProgress(null);
+      setActiveTab('dashboard');
     }
   }, [user]);
 
