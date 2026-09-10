@@ -68,7 +68,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Attribute 3 Form
+              Resource Survey
             </h1>
             <p className="text-sm text-slate-500 mt-1 max-w-xl">
               Please enter the infrastructure and learning resources metrics below.
@@ -76,15 +76,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onExportExcel}
-              leftIcon={<FileSpreadsheet className="w-4 h-4 text-emerald-600" />}
-            >
-              Export Excel Report
-            </Button>
-
             <Button
               variant="primary"
               size="sm"
@@ -128,12 +119,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2.5">
-                      <span className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 font-mono font-bold text-xs flex items-center justify-center border border-blue-200/60">
-                        {sec.code}
-                      </span>
-                      <h3 className="text-sm font-bold text-slate-800 leading-tight">
-                        {sec.title}
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base font-semibold text-slate-800 leading-tight">
+                        {sec.code} - {sec.title}
                       </h3>
                     </div>
 

@@ -57,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('attribute3_token');
     localStorage.removeItem('attribute3_local_user');
     localStorage.removeItem('attribute3_current_values');
+    localStorage.removeItem('attribute3_submissions');
     // Clear all proof-related local storage items
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {

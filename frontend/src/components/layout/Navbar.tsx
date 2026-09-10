@@ -33,7 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-base font-bold tracking-tight text-white">
-                  Attribute 3 Form
+                  Resource Survey
                 </span>
               </div>
             </div>

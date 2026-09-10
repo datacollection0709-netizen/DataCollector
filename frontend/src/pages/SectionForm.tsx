@@ -54,7 +54,6 @@ export const SectionForm: React.FC<SectionFormProps> = ({
   const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const [filterPendingOnly, setFilterPendingOnly] = useState<boolean>(false);
-  const [viewMode, setViewMode] = useState<'sheet' | 'cards'>('sheet');
   const [selectedUploadField, setSelectedUploadField] = useState<any | null>(null);
   const [activeRemarkField, setActiveRemarkField] = useState<string | null>(null);
   const [isPreFilling, setIsPreFilling] = useState(false);
@@ -351,16 +350,6 @@ export const SectionForm: React.FC<SectionFormProps> = ({
               <span>{isPreFilling ? 'Populating...' : '⚡ 1-Click Auto-Fill (All Sections)'}</span>
             </button>
 
-            {/* Download Excel Button */}
-            <button
-              type="button"
-              onClick={handleQuickDownloadExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-sm"
-              title="Download full Excel report with all data & photos"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Download Excel</span>
-            </button>
 
             {nextCode ? (
               <Button variant="primary" size="sm" onClick={handleNext} rightIcon={<ArrowRight className="w-3.5 h-3.5" />}>
@@ -390,35 +379,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
-            {/* View Mode Toggle: Sheet vs Cards */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
-              <button
-                type="button"
-                onClick={() => setViewMode('sheet')}
-                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                  viewMode === 'sheet'
-                    ? 'bg-white text-brand-700 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="Spreadsheet view"
-              >
-                <Table className="w-3.5 h-3.5" />
-                <span>Sheet View</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('cards')}
-                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                  viewMode === 'cards'
-                    ? 'bg-white text-brand-700 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="Card by card view"
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Card View</span>
-              </button>
-            </div>
+
 
             {/* Filter Toggle: All vs Pending */}
             <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
@@ -452,8 +413,8 @@ export const SectionForm: React.FC<SectionFormProps> = ({
         </div>
       </div>
 
-      {/* VIEW MODE 1: EFFORTLESS SPREADSHEET SHEET VIEW */}
-      {viewMode === 'sheet' ? (
+      {/* VIEW MODE 1: EFFORTLESS SPREADSHEET SHEET VIEW (Desktop) */}
+      <div className="hidden lg:block">
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
@@ -676,8 +637,10 @@ export const SectionForm: React.FC<SectionFormProps> = ({
             </table>
           </div>
         </div>
-      ) : (
-        /* VIEW MODE 2: CARD VIEW */
+      </div>
+
+      {/* VIEW MODE 2: CARD VIEW (Mobile) */}
+      <div className="block lg:hidden">
         <div className="space-y-4">
           {displayedFields.map((field: any) => {
             const fieldValues: Record<string, any> = {};
@@ -699,7 +662,7 @@ export const SectionForm: React.FC<SectionFormProps> = ({
             );
           })}
         </div>
-      )}
+      </div>
 
       {/* Bottom Navigation */}
       <div className="flex items-center justify-between pt-4 border-t border-slate-200">
