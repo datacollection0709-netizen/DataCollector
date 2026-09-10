@@ -41,7 +41,6 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
   onExportExcel,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -96,7 +95,6 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
       if (res.mailtoUrl) {
         setMailtoUrl(res.mailtoUrl);
       }
-      setShowConfirmModal(false);
       onRefreshSubmission();
     } catch (err: any) {
       setSubmitError(err.message || 'Failed to submit form.');
@@ -116,10 +114,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
                 FINAL AUDIT & REVIEW
               </span>
               <StatusBadge status={submission?.status || 'DRAFT'} />
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                <Mail className="w-3 h-3 text-slate-400" />
-                Target: datacollection0709@gmail.com
-              </span>
+
             </div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               Attribute 3: Comprehensive Review
@@ -141,14 +136,7 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
           </div>
         </div>
 
-        {/* Informational Alerts */}
-        <div className="mt-4 p-3.5 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-start gap-2.5">
-          <Mail className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div className="leading-relaxed">
-            <strong>Admin Mailbox Notice:</strong> Submissions are automatically forwarded to <strong>datacollection0709@gmail.com</strong>.
-            The complete Excel workbook with embedded photo evidence is also downloaded directly to your device upon submitting.
-          </div>
-        </div>
+
 
         {/* Submit Actions */}
         <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3 flex-wrap">
@@ -178,43 +166,16 @@ export const ReviewSubmission: React.FC<ReviewSubmissionProps> = ({
           )}
 
           <Button
-            onClick={() => setShowConfirmModal(true)}
+            onClick={handleFinalSubmit}
             isLoading={isSubmitting}
             leftIcon={<Send className="w-4 h-4" />}
           >
-            Submit to Admin
+            Submit
           </Button>
         </div>
       </div>
 
-      {/* Confirmation Modal */}
-      {showConfirmModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center font-bold">
-                <Send className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Confirm Submission</h3>
-                <p className="text-xs text-slate-500">Dispatch to datacollection0709@gmail.com</p>
-              </div>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Your response will be recorded and an audit notification email will be dispatched to <strong>datacollection0709@gmail.com</strong>.
-              The final Excel report with your in-cell photos and hyperlinks will also be downloaded immediately.
-            </p>
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <Button variant="outline" size="sm" onClick={() => setShowConfirmModal(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleFinalSubmit} isLoading={isSubmitting}>
-                Confirm & Submit
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Sections Review Accordions */}
       <div className="space-y-4">

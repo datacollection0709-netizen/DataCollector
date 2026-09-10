@@ -55,8 +55,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    localStorage.clear();
-    await proofStorage.clearAllProofs();
+    localStorage.removeItem('attribute3_token');
+    localStorage.removeItem('attribute3_local_user');
+    localStorage.removeItem('attribute3_current_values');
+    // DO NOT clear attribute3_submissions or proofStorage! This allows same-user persistence.
     setUser(null);
   };
 

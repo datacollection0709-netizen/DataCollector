@@ -93,8 +93,9 @@ class LocalApiClient {
 
   // Auth
   async login(name: string, department: string) {
+    const userId = `user-${name.replace(/\W+/g, '-').toLowerCase()}-${department.replace(/\W+/g, '-').toLowerCase()}`;
     const user = {
-      id: 'local-user-id',
+      id: userId,
       name: name,
       role: 'DATA_ENTRY' as const,
       organizationId: 'local-org-id',
@@ -137,16 +138,20 @@ class LocalApiClient {
   }
 
   async getCurrentSubmission() {
+    const user = this.getLocalUser();
     const subs = this.getSubmissionsData();
-    const subList = Object.values(subs).sort(
-      (a: any, b: any) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
-    );
+    const subList = Object.values(subs)
+      .filter((s: any) => s.userId === user?.id)
+      .sort(
+        (a: any, b: any) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
+      );
 
     let current: any = subList[0];
 
     if (!current) {
       current = {
-        id: `sub-${Date.now()}`,
+        id: `sub-${user?.id || 'anon'}-${Date.now()}`,
+        userId: user?.id,
         status: 'DRAFT',
         values: [],
         documents: [],
@@ -160,10 +165,11 @@ class LocalApiClient {
     // Sync documents with proofStorage (IndexedDB) to ensure images and links are never lost
     try {
       const storedProofs = await proofStorage.getAllProofs();
-      if (storedProofs && storedProofs.length > 0) {
+      const userProofs = storedProofs.filter((sp: any) => sp.userId === user?.id);
+      if (userProofs && userProofs.length > 0) {
         const docMap = new Map<string, any>();
         (current.documents || []).forEach((d: any) => docMap.set(d.id, d));
-        storedProofs.forEach((sp) => {
+        userProofs.forEach((sp) => {
           const existing = docMap.get(sp.id) || {};
           docMap.set(sp.id, {
             ...existing,
@@ -713,6 +719,7 @@ class LocalApiClient {
     // Save to IndexedDB (proofStorage) for caching
     const storedProof: StoredProof = {
       id: fileId,
+      userId: this.getLocalUser()?.id,
       fieldCode,
       yearCode,
       fileName: file.name,
@@ -772,6 +779,7 @@ class LocalApiClient {
     const fileId = `link-${Date.now()}`;
     const storedProof: StoredProof = {
       id: fileId,
+      userId: this.getLocalUser()?.id,
       fieldCode,
       yearCode,
       fileName,

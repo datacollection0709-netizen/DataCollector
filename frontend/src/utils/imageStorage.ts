@@ -1,6 +1,7 @@
 // IndexedDB storage for audit proof files (photos & PDFs)
 export interface StoredProof {
   id: string;
+  userId?: string;
   fieldCode: string;
   yearCode?: string | null;
   fileName: string;

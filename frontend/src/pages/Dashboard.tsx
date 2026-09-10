@@ -76,14 +76,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={onNavigateReview}
-              rightIcon={<ArrowRight className="w-4 h-4" />}
-            >
-              Review & Submit
-            </Button>
           </div>
         </div>
 
