@@ -13,10 +13,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onDataCleared }
   const { user, logout } = useAuth();
 
   const handleClearDepartment = async () => {
-    const dept = user?.organizationName || 'this department';
     if (
       window.confirm(
-        `Are you sure you want to clear all entered data for ${dept}? This will reset this department's form back to a blank state.`
+        'Are you sure you want to clear all entered data for this department? This will reset this department\'s form back to a blank state.'
       )
     ) {
       await api.clearCurrentDepartmentData();
@@ -59,12 +58,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onDataCleared }
           {/* Department Session & Controls */}
           <div className="flex items-center gap-2.5 sm:gap-3">
             {user && (
-              <div className="hidden sm:flex flex-col text-right pr-1">
+              <div className="hidden sm:flex items-center text-right pr-1">
                 <span className="text-xs font-semibold text-white truncate max-w-[200px]">
                   {user.name}
-                </span>
-                <span className="text-[11px] text-slate-400 truncate max-w-[200px]">
-                  {user.organizationName}
                 </span>
               </div>
             )}

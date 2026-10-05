@@ -51,22 +51,22 @@ Built directly from the original source workbook: `Data Collection Sheet for Att
 * **Backend**:
   * **Node.js 22** + **Express** + **TypeScript**
   * **Prisma ORM** (Zero-config local SQLite + full PostgreSQL production schema)
-  * **JWT Authentication** + **bcryptjs** password hashing
+  * **Authentication** & Session Management
   * **Multer** secure file upload with MIME type validation (PDF, Word, Excel, Images) and 15MB file size limits
   * **ExcelJS** generating authentic 8-sheet Excel workbooks mirroring the original template
   * **Vitest** + **Supertest** automated test suite (23 passing unit, API, Excel, and E2E integration tests)
 
 ---
 
-## 3. Pre-configured Demo Accounts
+## 3. Department Session Access
 
-For immediate local evaluation, one-click login buttons are available on the login screen:
+Departmental data officers sign in directly with their name and academic department:
 
-| Role | Name | Email | Password | Permissions |
-|---|---|---|---|---|
-| **Data Officer** | Krishna Verma | `entry@institution.edu` | `Entry@123` | Enter data, save drafts, upload proofs, submit form |
-| **Reviewer** | Prof. Sunita Patel | `reviewer@institution.edu` | `Reviewer@123` | Review all sections, view proofs, approve, reject with mandatory reason |
-| **Administrator** | Dr. Ramesh Sharma | `admin@institution.edu` | `Admin@123` | User directory, system diagnostics, immutable audit logs, excel export |
+| Role | Default Access | Description |
+|---|---|---|
+| **Data Officer** | Name + Academic Department | Enter data, save drafts, upload proofs, submit form |
+| **Reviewer** | Institutional Reviewer | Review all sections, view proofs, verify submissions |
+| **Administrator** | Institutional Admin | System diagnostics, audit logs, excel export |
 
 ---
 
@@ -147,7 +147,7 @@ The project is built with Prisma and includes a production PostgreSQL schema (`b
 To connect to a managed PostgreSQL instance:
 1. Update `backend/.env`:
    ```env
-   DATABASE_URL="postgresql://postgres:[PASSWORD]@[HOST]:5432/[DB]?sslmode=require"
+   DATABASE_URL="postgresql://postgres:[SECRET_KEY]@[HOST]:5432/[DB]?sslmode=require"
    ```
 2. Replace `provider = "sqlite"` with `provider = "postgresql"` in `backend/prisma/schema.prisma` (or copy from `schema.postgresql.prisma`).
 3. Run `npm --prefix backend run db:push` to apply the schema.

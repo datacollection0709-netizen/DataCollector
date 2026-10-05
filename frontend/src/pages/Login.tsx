@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Building2, Shield, UserCheck, KeyRound, AlertCircle, ArrowRight, CheckCircle2 } from 'lucide-react';
-import { useAuth, UserRole } from '../context/AuthContext';
+import { Building2, AlertCircle, ArrowRight } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 
 export const Login: React.FC = () => {

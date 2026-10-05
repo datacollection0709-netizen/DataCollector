@@ -28,7 +28,7 @@ It acts as a digital replacement for manual Excel-based data collection, offerin
 *   **Validation**: Zod (for validating API payloads).
 *   **File Uploads**: Multer (stores files securely, enforces type/size limits).
 *   **Excel Generation**: ExcelJS (generates complex, multi-sheet Excel reports).
-*   **Authentication**: JWT (JSON Web Tokens) with `bcryptjs` for password hashing.
+*   **Authentication**: Institutional session authentication with role-based access.
 
 ### **Database (ORM: Prisma)**
 *   **Local/Dev**: SQLite for zero-config local development.
